@@ -1,0 +1,29 @@
+# Bí mật
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Log chạy local
+backend/logs/
+
+# Dữ liệu sinh ra (to, tạo lại được bằng script)
+data/raw/
+data/clean/
+data/chunks/
+finetune/datasets/
+finetune/outputs/
+*.gguf
+*-lora/
+*-lora-gguf/
+eval/results/
+
+# Hệ điều hành / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

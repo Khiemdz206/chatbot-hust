@@ -1,0 +1,6 @@
+# Để chạy make_sft_dataset.py trên máy cá nhân.
+# Việc train chạy trên Colab (xem train_lora_colab.py), không cần cài ở đây.
+anthropic>=0.40
+openai>=1.50
+python-dotenv>=1.0
+pydantic>=2.7

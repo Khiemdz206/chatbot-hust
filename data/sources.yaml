@@ -1,0 +1,30 @@
+# Danh sách nguồn dữ liệu (nhóm Data điền, task T1).
+#
+# Mỗi nguồn là MỘT văn bản hoặc MỘT trang. Trường bắt buộc: id, title, url, type.
+#   id            : tên ngắn không dấu, dùng làm tên file (vd. quy-che-dao-tao-2025)
+#   type          : html | pdf
+#   doc_type      : quy_che | thong_bao | so_tay | huong_dan
+#   topic         : dkhp | hoc_phi | diem | tot_nghiep | hoc_bong | khac
+#   effective_date: ngày hiệu lực YYYY-MM-DD (nếu văn bản ghi rõ)
+#   applies_to    : khoá áp dụng (nếu có)
+#
+# Hai mục dưới là MẪU để thấy định dạng. Thay bằng URL thật trên trang của trường.
+
+sources:
+  - id: vi-du-quy-che
+    title: "Quy chế đào tạo (điền tên đầy đủ)"
+    url: "https://example.com/duong-dan-toi-file-quy-che.pdf"
+    type: pdf
+    doc_type: quy_che
+    topic: diem
+    effective_date: null
+    applies_to: null
+
+  - id: vi-du-thong-bao
+    title: "Thông báo đăng ký học phần (điền tên đầy đủ)"
+    url: "https://example.com/duong-dan-toi-trang-thong-bao"
+    type: html
+    doc_type: thong_bao
+    topic: dkhp
+    effective_date: null
+    applies_to: null

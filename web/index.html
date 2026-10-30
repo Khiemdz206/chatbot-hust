@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chatbot HUST</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">BK</span>
+      <div>
+        <h1>Chatbot HUST</h1>
+        <p>Hỏi đáp học vụ, có trích nguồn văn bản của trường</p>
+      </div>
+    </div>
+    <button type="button" class="ghost" id="new-chat">Cuộc trò chuyện mới</button>
+  </header>
+
+  <main class="chat" id="chat" aria-live="polite">
+    <section class="empty" id="empty">
+      <h2>Bạn muốn hỏi gì về học vụ?</h2>
+      <p>Câu trả lời lấy từ quy chế, sổ tay và thông báo chính thức. Luôn kiểm tra lại nguồn trước khi làm theo.</p>
+      <div class="suggestions" id="suggestions">
+        <button type="button">Đăng ký học phần bổ sung thế nào?</button>
+        <button type="button">Học phí tính theo tín chỉ ra sao?</button>
+        <button type="button">Học lại để cải thiện điểm được không?</button>
+        <button type="button">Điều kiện xét tốt nghiệp là gì?</button>
+      </div>
+    </section>
+    <ol class="messages" id="messages"></ol>
+  </main>
+
+  <form class="composer" id="composer">
+    <label for="input" class="sr-only">Câu hỏi</label>
+    <textarea id="input" rows="1" maxlength="1000" placeholder="Nhập câu hỏi học vụ…" title="Enter để gửi, Shift+Enter để xuống dòng" required></textarea>
+    <button type="submit" id="send">Gửi</button>
+  </form>
+  <p class="disclaimer">Chatbot không thay thế thông báo chính thức của trường.</p>
+
+  <template id="tpl-user">
+    <li class="msg user"><div class="bubble"></div></li>
+  </template>
+  <template id="tpl-bot">
+    <li class="msg bot">
+      <div class="bubble"><span class="status">Đang tìm văn bản liên quan…</span><div class="text"></div></div>
+      <ol class="sources" hidden></ol>
+      <div class="feedback" hidden>
+        <span>Câu trả lời có đúng không?</span>
+        <button type="button" data-rating="1">Đúng</button>
+        <button type="button" data-rating="-1">Sai</button>
+      </div>
+    </li>
+  </template>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

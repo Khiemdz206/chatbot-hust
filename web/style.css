@@ -1,0 +1,104 @@
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --ink: #161a22;
+  --muted: #5a6170;
+  --line: #dde1e7;
+  --hust: #a6192e;
+  --hust-soft: #f6e8ea;
+  --ok: #0f7f74;
+  --font: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --w: 760px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151b; --surface: #1a1e26; --ink: #e8eaee; --muted: #9aa3b2;
+    --line: #2c323d; --hust: #e2546a; --hust-soft: #3a1d23; --ok: #3fc2b3;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; display: flex; flex-direction: column;
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font); font-size: 16px; line-height: 1.6;
+}
+button { font: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--hust); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ---- thanh trên ---- */
+.topbar {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; gap: 12px; align-items: center; }
+.logo {
+  width: 36px; height: 36px; border-radius: 8px; background: var(--hust); color: #fff;
+  display: grid; place-items: center; font-weight: 700;
+}
+.brand h1 { font-size: 1.05rem; margin: 0; line-height: 1.2; }
+.brand p { margin: 0; font-size: 13px; color: var(--muted); }
+.ghost {
+  border: 1px solid var(--line); background: transparent; color: var(--ink);
+  padding: 6px 12px; border-radius: 8px; font-size: 14px;
+}
+.ghost:hover { border-color: var(--muted); }
+.ghost { white-space: nowrap; }
+@media (max-width: 480px) { .brand p { display: none; } .topbar { padding: 10px 14px; } }
+
+/* ---- vùng chat ---- */
+.chat { flex: 1; overflow-y: auto; padding: 24px 16px; }
+.empty, .messages { max-width: var(--w); margin: 0 auto; }
+.empty { padding-top: 8vh; }
+.empty h2 { font-size: 1.6rem; letter-spacing: -0.02em; margin: 0 0 8px; }
+.empty p { color: var(--muted); margin: 0 0 20px; }
+.suggestions { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.suggestions button {
+  text-align: left; padding: 12px 14px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+}
+.suggestions button:hover { border-color: var(--hust); }
+
+.messages { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 18px; }
+.msg { display: flex; flex-direction: column; }
+.msg.user { align-items: flex-end; }
+.bubble { padding: 10px 14px; border-radius: 14px; max-width: 90%; white-space: pre-wrap; word-wrap: break-word; }
+.user .bubble { background: var(--hust); color: #fff; border-bottom-right-radius: 4px; }
+.bot .bubble { background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.bot .status { color: var(--muted); font-size: 14px; }
+.bot .status:empty { display: none; }
+.cite { color: var(--hust); font-weight: 700; text-decoration: none; font-size: 0.8em; vertical-align: super; }
+.bot.error .bubble { border-color: var(--hust); }
+
+.sources { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; max-width: 90%; }
+.sources li {
+  font-size: 13.5px; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+}
+.sources li:target { border-color: var(--hust); }
+.sources b { color: var(--hust); margin-right: 6px; }
+.sources a { color: var(--ink); }
+
+.feedback { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); margin-top: 6px; }
+.feedback button { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 6px; padding: 2px 10px; font-size: 13px; }
+.feedback button[aria-pressed="true"] { border-color: var(--ok); color: var(--ok); }
+
+/* ---- ô nhập ---- */
+.composer {
+  display: flex; gap: 8px; width: 100%; max-width: calc(var(--w) + 32px);
+  margin: 0 auto; padding: 0 16px;
+}
+.composer textarea {
+  flex: 1; resize: none; max-height: 160px;
+  font: inherit; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+}
+.composer button {
+  border: 0; border-radius: 12px; padding: 0 20px;
+  background: var(--hust); color: #fff; font-weight: 600;
+}
+.composer button:disabled { opacity: 0.5; cursor: not-allowed; }
+.disclaimer { text-align: center; font-size: 12.5px; color: var(--muted); margin: 8px 0 12px; }
