@@ -61,39 +61,59 @@ web ──► backend ──HTTP──► Ollama (máy nhóm)  hoặc  vLLM (GPU
 
 Chỉ đổi `.env`, không sửa code.
 
-### 5.2. Cách 1 (khuyên dùng): Ollama trên máy nhóm
+### 5.2. Cách nhóm dùng: Ollama trên máy Mac của nhóm
 
-Phù hợp model 3B (vừa GPU 4GB) hoặc 7B 4-bit (chạy được với RAM lớn, chậm hơn).
+Nhóm có một bạn dùng MacBook Pro. Mac chip M (M1 trở lên) dùng chung RAM cho cả CPU và GPU, nên chạy model 4-bit khá tốt. Laptop GPU 4GB thì không nên dùng để chạy model.
 
-1. Trên Colab, chạy hết `train_lora_colab.py`, tới ô 8 sẽ có thư mục `chatbot-hust-lora-gguf/` chứa file `.gguf`.
-2. Copy thư mục đó sang Google Drive, tải về máy, đặt cạnh `finetune/serve/Modelfile`.
-3. Cài Ollama (ollama.com), rồi:
+Cỡ model nên chọn theo RAM của máy Mac (con số tham khảo, phải đo thật):
+
+| RAM máy Mac | Cỡ model 4-bit (Q4_K_M) chạy thoải mái |
+| --- | --- |
+| 16 GB | 7–8B (file ~4,5–5 GB) |
+| 24–36 GB | 7–8B rất thoải mái; thử được ~14B |
+| 48 GB trở lên | ~14B, có thể hơn |
+
+Các bước (người có máy Mac làm):
+
+1. Trên Colab Pro, chạy hết `train_lora_colab.py`. Tới ô 8 sẽ có thư mục `chatbot-hust-lora-gguf/` chứa file `.gguf`. Copy sang Google Drive.
+2. Trên Mac: cài Ollama (ollama.com, bản cho macOS), tải thư mục GGUF từ Drive về, đặt cạnh `finetune/serve/Modelfile`.
+3. Tạo và thử model:
    ```bash
    cd finetune/serve
    # sửa dòng FROM trong Modelfile cho đúng tên file .gguf
    ollama create chatbot-hust -f Modelfile
    ollama run chatbot-hust "Xin chào"
    ```
-4. Kiểm tra API chuẩn OpenAI đã mở:
+4. Kiểm tra API chuẩn OpenAI:
    ```bash
    curl http://localhost:11434/v1/chat/completions -H "Content-Type: application/json" \
      -d '{"model":"chatbot-hust","messages":[{"role":"user","content":"Xin chào"}]}'
    ```
-5. Sửa `.env` rồi chạy lại backend:
+5. Chạy backend **ngay trên máy Mac**, đặt trong `.env`:
    ```env
    LLM_PROVIDER=openai_compat
    OPENAI_BASE_URL=http://localhost:11434/v1
    LLM_MODEL=chatbot-hust
    ```
-6. Hỏi trên web. `GET /api/health` phải báo `openai_compat` và `chatbot-hust`.
+   Mở <http://localhost:8000>, `GET /api/health` phải báo `openai_compat` và `chatbot-hust`.
 
-**Khi backend đã deploy lên mạng** (Render, Railway), nó không gọi được `localhost` của laptop. Lúc demo có hai cách: chạy backend ngay trên máy có Ollama, hoặc mở đường hầm (ngrok, Cloudflare Tunnel) cho cổng 11434 rồi đặt `OPENAI_BASE_URL` thành địa chỉ đường hầm. Đường hầm công khai thì phải đặt mật khẩu/token, đừng để ai cũng gọi được.
+**Cho cả nhóm cùng dùng model trên Mac (cùng mạng Wi-Fi):**
+
+- Mặc định Ollama chỉ nhận kết nối từ chính máy Mac. Mở cho máy khác trong mạng:
+  ```bash
+  launchctl setenv OLLAMA_HOST "0.0.0.0"
+  # rồi tắt hẳn app Ollama và mở lại
+  ```
+- Xem IP của Mac: *System Settings → Wi-Fi → Details*. Máy khác đặt `OPENAI_BASE_URL=http://<ip-cua-mac>:11434/v1`.
+- Ollama **không có mật khẩu**. Chỉ mở như vậy trong mạng tin cậy (Wi-Fi nhà, hotspot của nhóm). Wi-Fi trường thường chặn các máy nói chuyện với nhau, khi đó dùng hotspot điện thoại.
+
+**Khi demo hoặc cho người ngoài dùng:** đừng đưa Ollama ra Internet. Chạy backend trên chính máy Mac (backend gọi `localhost:11434`), rồi chỉ mở backend ra ngoài bằng đường hầm (Cloudflare Tunnel, ngrok). Máy Mac phải bật và không ngủ suốt buổi demo (*System Settings → Battery/Energy*, hoặc chạy `caffeinate -i` trong Terminal).
 
 Nếu câu trả lời bị lặp hoặc lẫn ký tự lạ: Modelfile đang thiếu chat template. Dùng Modelfile mà Unsloth xuất kèm (nếu có), hoặc thêm `TEMPLATE` đúng dòng model.
 
-### 5.3. Cách 2: vLLM trên GPU
+### 5.3. Cách khác: vLLM trên GPU
 
-Phù hợp khi cần nhanh hoặc nhiều người dùng cùng lúc. Chạy trên Colab/Kaggle được cho demo ngắn (phiên sẽ tắt sau vài giờ), hoặc thuê GPU theo giờ.
+vLLM cần GPU NVIDIA, **không chạy trên Mac**. Chỉ cân nhắc khi cần nhiều người dùng cùng lúc. Chạy được trên Colab Pro cho demo ngắn (phiên vẫn có giới hạn thời gian), hoặc thuê GPU theo giờ.
 
 ```bash
 pip install vllm
@@ -115,7 +135,8 @@ Một số dịch vụ nhận adapter/model của mình và trả về một API
 ### Tuần 1–3: học và hỗ trợ
 - [ ] Tuần 1: hỗ trợ Eval viết câu hỏi cho bộ đề (bạn sẽ hiểu sinh viên hỏi gì, rất có ích khi sinh dữ liệu).
 - [ ] Tuần 2: hỗ trợ Data đọc kiểm văn bản đã làm sạch.
-- [ ] Tuần 3: chạy thử `train_lora_colab.py` với **20 mẫu tự viết tay** để chắc mọi ô chạy được, xuất GGUF, chạy được bằng Ollama trên máy. Phát hiện lỗi môi trường sớm.
+- [ ] Tuần 3: chạy thử `train_lora_colab.py` trên Colab Pro với **20 mẫu tự viết tay** để chắc mọi ô chạy được, xuất GGUF, nhờ bạn có máy Mac chạy bằng Ollama. Phát hiện lỗi môi trường sớm.
+- [ ] Tuần 3: trên máy Mac, `ollama run qwen2.5:7b` (model gốc, chưa fine-tune) với một prompt dài cỡ RAG (5–6 đoạn quy chế + câu hỏi). Đo thời gian tới chữ đầu tiên để chốt cỡ model.
 - [ ] Đọc điều khoản sử dụng của model định làm teacher: có cho dùng output để train model khác không. Không chắc thì chọn teacher open-weight.
 
 **Xong khi:** đi hết được đường Colab → GGUF → Ollama → backend với model đồ chơi.
@@ -130,9 +151,9 @@ Một số dịch vụ nhận adapter/model của mình và trả về một API
 **Xong khi:** `sft.jsonl` ~2.000 mẫu, tỉ lệ lỗi kiểm tay ≤ 10%, không trùng bộ eval.
 
 ### Tuần 6–7 – T14: train và so sánh
-- [ ] Chọn model gốc: bắt đầu với bản 3B (nhanh, vừa GPU nhỏ); còn thời gian thì thử 7–8B.
+- [ ] Chọn model gốc: mặc định bản 7–8B instruct (Colab Pro train được, Mac chạy được). Nếu đo ở tuần 3 thấy Mac chạy 7B quá chậm thì dùng 3B.
 - [ ] Train 2 epoch, theo dõi train/eval loss. Eval loss tăng lại thì giảm epoch.
-- [ ] Chạy model theo mục 5, trỏ backend vào, nhờ Eval chạy `run_eval.py` + `judge.py`.
+- [ ] Chạy model trên Mac theo mục 5.2, chạy backend trên Mac, nhờ Eval chạy `run_eval.py` + `judge.py` (Eval dùng máy khác thì đặt `--api http://<ip-cua-mac>:8000`).
 - [ ] Lập bảng so sánh A vs B: điểm đúng, % trích nguồn, % bịa, độ trễ, chi phí ước tính cho 1.000 câu hỏi.
 
 **Xong khi:** có bảng so sánh A vs B trên cùng bộ đề, Lead chọn được generator cho demo.
@@ -141,10 +162,12 @@ Một số dịch vụ nhận adapter/model của mình và trả về một API
 
 | Hiện tượng | Cách xử lý |
 | --- | --- |
-| Colab hết bộ nhớ GPU (OOM) | Giảm `per_device_train_batch_size` xuống 1, giảm `MAX_SEQ_LEN`, dùng model 3B |
+| Colab hết bộ nhớ GPU (OOM) | Chọn GPU lớn hơn trong Colab Pro (L4/A100 nếu còn), hoặc giảm `per_device_train_batch_size`, `MAX_SEQ_LEN` |
 | Colab ngắt giữa chừng | Lưu `outputs/` lên Google Drive; `trainer.train(resume_from_checkpoint=True)` |
 | Model trả lời không có `[n]` | Dataset ít mẫu có trích dẫn, hoặc system prompt lúc chạy khác lúc train |
 | Model trả lời tốt trên Colab, tệ trên Ollama | Sai chat template trong Modelfile |
+| Máy khác không gọi được Ollama trên Mac | Chưa đặt `OLLAMA_HOST=0.0.0.0` và mở lại Ollama; tường lửa macOS chặn; Wi-Fi trường chặn kết nối giữa các máy (dùng hotspot) |
+| Mac rất chậm, nóng | Model quá lớn so với RAM; xem bảng ở 5.2, giảm cỡ model hoặc giảm `num_ctx` |
 | Điểm B thấp hơn A nhiều | Bình thường với model nhỏ. Thử thêm dữ liệu, model lớn hơn, hoặc chấp nhận dùng A |
 
 ## 8. Bàn giao

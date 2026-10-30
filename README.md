@@ -62,7 +62,7 @@ Sửa file `.env` ở thư mục gốc, không cần sửa code:
 | Muốn | Đặt trong `.env` |
 | --- | --- |
 | Dùng model mạnh qua API (phương án A) | `LLM_PROVIDER=anthropic`, `LLM_MODEL=...`, `ANTHROPIC_API_KEY=...` |
-| Dùng model nhóm tự fine-tune (phương án B) | `LLM_PROVIDER=openai_compat`, `OPENAI_BASE_URL=http://localhost:11434/v1`, `LLM_MODEL=chatbot-hust` |
+| Dùng model nhóm tự fine-tune, chạy bằng Ollama trên Mac (phương án B) | `LLM_PROVIDER=openai_compat`, `OPENAI_BASE_URL=http://localhost:11434/v1`, `LLM_MODEL=chatbot-hust` |
 | Tìm trong dữ liệu thật | `RETRIEVER=supabase`, `SUPABASE_URL=...`, `SUPABASE_SERVICE_KEY=...` |
 
 Vì sao model fine-tune cũng gọi qua API được: xem [docs/14-finetune.md](docs/14-finetune.md#5-đưa-model-fine-tune-lên-web).

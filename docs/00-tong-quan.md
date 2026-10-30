@@ -68,7 +68,8 @@ Mỗi phần trong nhóm sở hữu một đoạn của đường đi này. Hợ
 | | Phương án A: API model mạnh | Phương án B: model nhỏ tự fine-tune |
 | --- | --- | --- |
 | Model | Opus 5.5 hoặc model mạnh khác | Qwen/Llama 3–8B + LoRA của nhóm |
-| Chạy ở đâu | Máy chủ của nhà cung cấp | Máy nhóm (Ollama) hoặc GPU thuê (vLLM) |
+| Train ở đâu | Không cần train | Colab Pro |
+| Chạy ở đâu | Máy chủ của nhà cung cấp | MacBook Pro của nhóm, bằng Ollama |
 | Backend gọi thế nào | HTTP API | HTTP API (Ollama/vLLM mở API chuẩn OpenAI) |
 | Chất lượng | Cao ngay từ đầu | Phải train, thường kém A một chút |
 | Chi phí | Trả theo token | Gần như miễn phí khi chạy, tốn công train |
@@ -85,7 +86,7 @@ web  ──HTTP──►  backend  ──HTTP──►  "máy chạy model"
 ```
 
 - Phương án A: "máy chạy model" là máy chủ của Anthropic/OpenAI.
-- Phương án B: "máy chạy model" là **Ollama** (trên laptop, máy lab) hoặc **vLLM** (trên GPU thuê). Hai phần mềm này mở ra một địa chỉ như `http://localhost:11434/v1` nói chuyện **y hệt API của OpenAI**.
+- Phương án B: "máy chạy model" là **Ollama** trên MacBook Pro của nhóm (model được train trên Colab Pro, xuất ra file GGUF rồi chép sang Mac). Hai phần mềm này mở ra một địa chỉ như `http://localhost:11434/v1` nói chuyện **y hệt API của OpenAI**.
 
 Nên backend chỉ cần đổi 3 dòng trong `.env`:
 

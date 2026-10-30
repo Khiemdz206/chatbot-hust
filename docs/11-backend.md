@@ -1,6 +1,6 @@
 # Hướng dẫn phần Backend
 
-**Người phụ trách:** TV5, phối hợp Khiêm ở chỗ nối với AI · **Thư mục:** `backend/app/` (trừ `rag/`), `supabase/` · **Task:** T3, T7, T12, T16
+**Người phụ trách:** TV5, phối hợp Khiêm ở chỗ nối với AI · **Thư mục:** `backend/app/` (trừ `rag/`), `supabase/` · **Task:** T3, T7, T12, T16, T19
 
 ## 1. Bạn làm gì
 
@@ -78,6 +78,15 @@ curl -N -X POST "http://localhost:8000/api/chat" \
 ### Tuần 4 – T12
 - [ ] `/api/feedback` ghi vào bảng `feedback`.
 - [ ] Endpoint nhỏ cho nhóm xem nhanh: `GET /admin/stats` (có `X-Admin-Token`) trả số câu hỏi, tỉ lệ đúng/sai theo feedback.
+
+### Tuần 5 – T19: kiểm soát chi phí API
+Phương án A gọi API trả tiền theo token, prompt RAG lại dài, nên phải làm trước khi mở cho người ngoài.
+- [ ] Ghi số token vào/ra của mỗi câu (lấy từ phản hồi API) vào `chat_logs`, cộng thành chi phí ước tính theo ngày.
+- [ ] Đặt hạn mức trong `.env`, vd. `DAILY_QUESTION_LIMIT=500`. Vượt hạn mức thì trả `RATE_LIMITED` kèm thông báo dễ hiểu.
+- [ ] Cache: câu hỏi giống hệt câu đã hỏi trong 24 giờ thì trả lại câu trả lời cũ.
+- [ ] Bật cảnh báo ngân sách trên trang quản trị của nhà cung cấp API.
+
+**Xong khi:** biết hôm qua tốn bao nhiêu tiền, và không thể vượt hạn mức đã đặt.
 
 ### Tuần 7 – T16: deploy công khai
 - [ ] `CORS_ORIGINS` chỉ còn domain của UI.

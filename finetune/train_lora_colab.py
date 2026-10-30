@@ -1,7 +1,7 @@
-# Fine-tune LoRA bằng Unsloth. Chạy trên Google Colab (GPU T4 miễn phí là đủ cho model 3B-8B 4-bit).
+# Fine-tune LoRA bằng Unsloth. Chạy trên Google Colab Pro (T4 đủ cho 3B-8B 4-bit; L4/A100 nhanh hơn nhiều).
 #
 # Cách dùng trên Colab:
-#   1. Runtime -> Change runtime type -> T4 GPU
+#   1. Runtime -> Change runtime type -> chọn GPU (Colab Pro: ưu tiên L4 hoặc A100 nếu còn)
 #   2. Ô đầu tiên:  !pip install unsloth
 #   3. Tải file datasets/sft.jsonl lên Colab (hoặc mount Google Drive)
 #   4. Dán từng khối "# %%" dưới đây vào từng ô và chạy lần lượt

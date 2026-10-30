@@ -22,10 +22,10 @@ Phạm vi v1: quy chế đào tạo, đăng ký học phần, học phí, điể
 | --- | --- | --- | --- | --- | --- |
 | **1** | Tạo repo, chạy mock, đọc hiểu `rag/`. T1 cùng Data | Học crawl + Supabase. **T1** bảng nguồn | **T2** bộ đề v1 (100 câu) + hỏi HustVA | Học nền LLM/LoRA. **T2** hỗ trợ viết câu hỏi | **T3** chạy mock, làm quen code UI/BE |
 | **2** | **T5** nối Supabase, thử embedding | **T4** crawl + làm sạch quy chế | Hoàn thiện bộ đề v1, viết đáp án chuẩn | Hỗ trợ Data kiểm văn bản đã làm sạch | **T7** UI: trạng thái, nguồn, lỗi |
-| **3** | **T6** chạy phương án A thật, chỉnh prompt | Chunk + đưa quy chế lên Supabase | **T8** chạy `run_eval` lần đầu | Chạy thử Unsloth với 20 mẫu trên Colab | **T7** BE: log vào Supabase, deploy thử |
+| **3** | **T6** chạy phương án A thật, chỉnh prompt | Chunk + đưa quy chế lên Supabase | **T8** chạy `run_eval` lần đầu | Chạy thử Unsloth với 20 mẫu trên Colab Pro; đo tốc độ Ollama trên Mac | **T7** BE: log vào Supabase, deploy thử |
 | **4** | **T10** hybrid + rerank + viết lại câu hỏi | **T9** thêm các nguồn còn lại | **T11** `judge.py`, kiểm judge vs chấm tay | **T13** sinh dataset SFT | **T12** feedback, trang Giới thiệu |
-| **5** | Sửa lỗi theo báo cáo eval | **T9** script cập nhật tự động | **T11** bộ đề v2 (200 câu) | **T13** lọc, kiểm tay 5% | Deploy bản ổn định cho nhóm dùng |
-| **6** | **T15** guardrails | Xử lý văn bản lỗi eval chỉ ra | Báo cáo lỗi theo chủ đề | **T14** train LoRA, xuất GGUF | Hỗ trợ FT chạy Ollama, nối backend |
+| **5** | Sửa lỗi theo báo cáo eval | **T9** script cập nhật tự động | **T11** bộ đề v2 (200 câu) | **T13** lọc, kiểm tay 5% | **T19** kiểm soát chi phí API; deploy bản ổn định |
+| **6** | **T15** guardrails | Xử lý văn bản lỗi eval chỉ ra | Báo cáo lỗi theo chủ đề | **T14** train LoRA trên Colab Pro, xuất GGUF | Cùng bạn có máy Mac chạy Ollama, nối backend |
 | **7** | Chọn generator cho demo | Rà soát dữ liệu lần cuối | **T16** thử với 10–20 SV | **T14** so sánh A/B | **T16** deploy công khai |
 | **8** | **T18** demo | **T17** báo cáo phần Data | **T17** số liệu tổng | **T17** báo cáo phần FT | **T18** demo |
 
@@ -50,5 +50,6 @@ Phạm vi v1: quy chế đào tạo, đăng ký học phần, học phí, điể
 - Deadline thật là khi nào? (kế hoạch giả định 8 tuần)
 - Giảng viên chấm nặng phần sản phẩm hay phần fine-tune? Nếu sản phẩm thì phương án B làm nhẹ.
 - Ngân sách API mỗi tháng? Ai giữ API key?
-- GPU fine-tune: Colab miễn phí, Colab Pro hay máy lab?
+- Ai giữ máy Mac chạy model? Máy đó cần bật suốt các buổi chạy eval và demo.
+- Ai giữ tài khoản Colab Pro, và lưu checkpoint ở Google Drive nào?
 - Deploy ở đâu? (gợi ý: backend trên Render/Railway gói miễn phí, Supabase gói miễn phí)

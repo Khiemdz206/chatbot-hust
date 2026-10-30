@@ -1,4 +1,4 @@
-# Tạo model Ollama từ file GGUF đã fine-tune.
+# Tạo model Ollama từ file GGUF đã fine-tune (chạy trên máy Mac của nhóm, xem docs/14-finetune.md mục 5.2).
 #
 #   ollama create chatbot-hust -f Modelfile
 #   ollama run chatbot-hust "xin chào"        # thử nhanh
