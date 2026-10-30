@@ -2,6 +2,8 @@
 
 Chatbot hỏi đáp học vụ cho sinh viên Đại học Bách khoa Hà Nội. Mục tiêu: trả lời đúng ngang hoặc hơn HustVA trên cùng một bộ câu hỏi, và **luôn chỉ ra nguồn văn bản**.
 
+Chatbot dùng **model nhỏ nhóm tự fine-tune, chạy local bằng Ollama**, không gọi API model trả tiền.
+
 Nhóm 4 người. Mỗi người làm trong thư mục của mình, mở Pull Request để gộp vào `main`.
 
 > **Vào repo lần đầu:** đọc file hướng dẫn của phần mình (bảng dưới), làm theo từng task. Nếu dùng AI agent, bảo agent đọc [AGENTS.md](AGENTS.md) trước rồi mới đọc file của bạn.
@@ -10,7 +12,7 @@ Nhóm 4 người. Mỗi người làm trong thư mục của mình, mở Pull Re
 
 | Người | Phần | Thư mục | Đọc file |
 | --- | --- | --- | --- |
-| Khiêm (Lead) | AI / RAG + Fine-tune | `backend/app/rag/`, `finetune/`, `common/` | [12-ai-rag.md](docs/12-ai-rag.md), [14-finetune.md](docs/14-finetune.md) |
+| Khiêm (Lead) | AI / RAG + Fine-tune | `backend/app/rag/`, `finetune/` | [12-ai-rag.md](docs/12-ai-rag.md), [14-finetune.md](docs/14-finetune.md) |
 | TV2 | Data | `data/`, `supabase/` | [13-data.md](docs/13-data.md) |
 | TV3 | Eval | `eval/` | [15-eval.md](docs/15-eval.md) |
 | TV4 | UI + Backend | `web/`, `backend/app/` (trừ `rag/`) | [10-ui.md](docs/10-ui.md), [11-backend.md](docs/11-backend.md) |
@@ -32,14 +34,13 @@ chatbot-hust/
 ├── supabase/       Cấu trúc CSDL (bảng, hàm tìm kiếm)
 ├── finetune/       Fine-tune: sinh dữ liệu, train LoRA trên Colab, chạy model bằng Ollama
 ├── eval/           Eval: bộ câu hỏi vàng, chạy và chấm điểm so với HustVA
-├── common/         Hàm gọi model dùng chung cho data/, finetune/, eval/
 ├── docs/           Hướng dẫn từng phần
 └── AGENTS.md       Quy tắc cho AI agent của từng thành viên
 ```
 
 ## Chạy thử trong 5 phút (chế độ mock)
 
-Mock không cần API key hay CSDL: backend trả lời giả và tìm trong vài đoạn văn bản mẫu ở `data/samples/sample_chunks.jsonl`.
+Mock không cần model hay CSDL: backend trả lời giả và tìm trong vài đoạn văn bản mẫu ở `data/samples/sample_chunks.jsonl`.
 
 Cần: Python 3.10 trở lên, Git.
 
@@ -66,15 +67,17 @@ Chỉ sửa `.env` ở thư mục gốc, không sửa code:
 
 | Muốn | Đặt trong `.env` |
 | --- | --- |
-| Model mạnh qua API (phương án A) | `LLM_PROVIDER=anthropic`, `LLM_MODEL=claude-opus-5-5`, `ANTHROPIC_API_KEY=...` |
-| Model nhóm tự fine-tune chạy bằng Ollama (phương án B) | `LLM_PROVIDER=openai_compat`, `OPENAI_BASE_URL=http://localhost:11434/v1`, `LLM_MODEL=chatbot-hust` |
+| Model gốc chạy bằng Ollama (trước khi có model fine-tune) | `LLM_PROVIDER=ollama`, `LLM_MODEL=qwen2.5:7b` |
+| Model nhóm đã fine-tune | `LLM_PROVIDER=ollama`, `LLM_MODEL=chatbot-hust` |
+| Ollama chạy trên máy khác cùng mạng | thêm `LLM_BASE_URL=http://<ip-may-do>:11434/v1` |
 | Tìm trong dữ liệu thật | `RETRIEVER=supabase`, `SUPABASE_URL=...`, `SUPABASE_SERVICE_KEY=...` |
 
-Chi tiết phương án B: [docs/14-finetune.md, mục 5](docs/14-finetune.md#5-đưa-model-fine-tune-lên-web).
+Cài Ollama và tạo model: [docs/14-finetune.md, mục 5](docs/14-finetune.md#5-đưa-model-fine-tune-lên-web).
 
 ## Quy tắc chung
 
 - `main` luôn chạy được. Không push thẳng vào `main`.
-- Không commit `.env`, API key, dữ liệu crawl, file model.
+- Không commit `.env`, key Supabase, dữ liệu crawl, file model.
 - Đổi định dạng trong `docs/02-api-contract.md` thì báo cả nhóm và sửa file đó trong cùng PR.
 - PR của AI, Data, Fine-tune phải kèm kết quả eval trước/sau.
+- Việc sinh dữ liệu train và chấm điểm eval do **AI agent của từng người** làm (theo `finetune/TEACHER.md`, `eval/RUBRIC.md`), không qua API.

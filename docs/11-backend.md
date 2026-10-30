@@ -2,7 +2,7 @@
 
 **Thư mục được sửa:** `backend/app/` **trừ** `backend/app/rag/` (của Khiêm), `backend/tests/`, file mới trong `supabase/migrations/`, `.env.example` · **Task:** T3, T7b, T12b, T19, T16a · Phần UI của bạn: [10-ui.md](10-ui.md)
 
-Việc của bạn: lớp mỏng giữa UI và AI. Nhận câu hỏi, kiểm tra, gọi `pipeline.answer()`, đẩy kết quả về UI theo từng chữ, ghi log, giới hạn tần suất và chi phí. **Không viết logic AI ở đây** (tìm kiếm, prompt, gọi model) để Khiêm đổi bên trong `rag/` mà không ảnh hưởng API.
+Việc của bạn: lớp mỏng giữa UI và AI. Nhận câu hỏi, kiểm tra, gọi `pipeline.answer()`, đẩy kết quả về UI theo từng chữ, ghi log, giới hạn tần suất và tải cho máy Mac chạy model. **Không viết logic AI ở đây** (tìm kiếm, prompt, gọi model) để Khiêm đổi bên trong `rag/` mà không ảnh hưởng API.
 
 ## 1. Code hiện có
 
@@ -61,9 +61,11 @@ Mỗi thay đổi hành vi API phải có test trong `backend/tests/`. Test đ�
 
 **Bàn giao:** báo TV2 "Supabase sẵn sàng" (TV2 cần cho T4).
 
-### T7b – Nối thật và deploy thử (tuần 3)
+### T7b – Nối thật và chạy chung trên máy Mac (tuần 3)
 
-**Mục tiêu:** bản deploy thử trả lời thật, log vào Supabase, lỗi model được báo đúng cho UI.
+**Mục tiêu:** backend chạy trên máy Mac cùng Ollama, trả lời thật, log vào Supabase, lỗi model được báo đúng cho UI. Cả nhóm trong cùng Wi-Fi dùng được.
+
+Nhóm không dùng API trả tiền: model chạy bằng Ollama trên máy Mac, nên **backend cũng chạy trên máy Mac đó** (không deploy lên host miễn phí: host không có model, và bge-m3 cần ~3 GB RAM).
 
 **Các bước:**
 
@@ -71,14 +73,14 @@ Mỗi thay đổi hành vi API phải có test trong `backend/tests/`. Test đ�
    - `message` 1001 ký tự → 422.
    - Hai câu liên tiếp cùng `session_id` khi `MIN_SECONDS_BETWEEN_QUESTIONS > 0` → câu thứ hai 429, body `{"code": "RATE_LIMITED", ...}`. (File test đặt biến này bằng `0`; đổi tạm `settings.min_seconds_between_questions` trong test bằng `monkeypatch.setattr`.)
    - `pipeline.answer` ném exception → stream có `event: error`, không stream trả 502. Dùng `monkeypatch.setattr(pipeline, "answer", hàm_lỗi)`.
-2. Cùng Khiêm chạy với `LLM_PROVIDER=anthropic`: stream vẫn chạy dần; đặt sai `ANTHROPIC_API_KEY` → UI nhận sự kiện `error` với thông báo tiếng Việt.
+2. Cùng Khiêm chạy trên Mac với `LLM_PROVIDER=ollama`: stream vẫn chạy dần; tắt Ollama giữa chừng → UI nhận sự kiện `error` với thông báo tiếng Việt.
 3. Lỗi `log_feedback` hiện làm `/api/feedback` trả 500: bọc `try/except` giống `log_chat`, vẫn trả `{"ok": true}` và `print` lỗi.
-4. **Deploy thử** (Render hoặc Railway): Start command `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, Root directory `backend`. Khai báo biến môi trường trên trang quản trị của host, **không** upload `.env`. Lưu ý RAM: xem T16a.
-5. Kiểm tra `/api/health` trên bản deploy.
+4. Trên Mac chạy `uvicorn app.main:app --host 0.0.0.0 --port 8000`. Từ máy khác cùng Wi-Fi mở `http://<ip-cua-mac>:8000` (IP: *System Settings → Wi-Fi → Details*). Wi-Fi trường chặn thì dùng hotspot điện thoại.
+5. Viết script `backend/run_mac.sh` khởi động một lệnh: kiểm tra Ollama đang chạy (`curl -s localhost:11434`), rồi chạy uvicorn như trên.
 
-**Kiểm tra:** `pytest -q` pass hết (≥ 9 test); hỏi trên bản deploy nhận câu trả lời thật; `chat_logs` có dòng tương ứng.
+**Kiểm tra:** `pytest -q` pass hết (≥ 9 test); máy khác hỏi qua `http://<ip-cua-mac>:8000` nhận câu trả lời thật; `chat_logs` có dòng tương ứng.
 
-**Bàn giao:** gửi URL bản deploy cho TV3 và Khiêm.
+**Bàn giao:** gửi địa chỉ cho TV3 và Khiêm.
 
 ### T12b – Thống kê cho nhóm (tuần 4)
 
@@ -97,45 +99,43 @@ Mỗi thay đổi hành vi API phải có test trong `backend/tests/`. Test đ�
 
 **Kiểm tra:** test cho 401 khi sai token và 200 với đúng các khoá trên.
 
-### T19 – Kiểm soát chi phí API (tuần 5)
+### T19 – Giới hạn tải cho máy Mac (tuần 5)
 
-**Mục tiêu:** biết mỗi ngày tốn bao nhiêu tiền và không thể vượt hạn mức. Phương án A trả tiền theo token, prompt RAG dài (~3.000–5.000 token mỗi câu), nên phải xong trước khi mở cho người ngoài.
+**Mục tiêu:** nhiều người hỏi cùng lúc thì máy Mac không bị treo, người hỏi nhận thông báo rõ ràng thay vì chờ mãi.
 
-**Cần trước:** Khiêm thêm `usage: {"input_tokens", "output_tokens"}` vào sự kiện `meta` của `pipeline.answer` ([02-api-contract.md mục 5](02-api-contract.md#5-pipelineanswer-hợp-đồng-giữa-backend-và-ai)). Nhắn Khiêm đầu tuần 5. Trong lúc chờ, coi `usage` là `None`.
-
-**Các bước:**
-
-1. Migration mới `supabase/migrations/002_usage.sql`:
-   ```sql
-   alter table chat_logs add column if not exists input_tokens int, add column if not exists output_tokens int;
-   ```
-   Chạy trong SQL Editor. Ghi hai cột này trong `log_row()` từ `meta.get("usage")`.
-2. Thêm vào `config.py` + `.env.example`: `DAILY_QUESTION_LIMIT` (mặc định `500`), `PRICE_INPUT_PER_MTOK`, `PRICE_OUTPUT_PER_MTOK` (giá USD trên 1 triệu token của model đang dùng, lấy ở trang giá của nhà cung cấp).
-3. Hạn mức ngày: đếm số câu hỏi trong ngày (theo giờ Việt Nam, UTC+7) trong RAM, reset khi sang ngày mới. Vượt thì 429 `RATE_LIMITED`, `message`: "Hôm nay chatbot đã nhận quá nhiều câu hỏi, bạn quay lại vào ngày mai nhé." Câu từ chối do không tìm thấy văn bản (không gọi model) không tính.
-4. Cache: câu hỏi giống hệt (so sau khi `strip().lower()` và chuẩn hoá NFC), **không có `history`**, trong 24 giờ → trả lại câu trả lời cũ (vẫn phát SSE như bình thường, `answer_id` mới). Lưu cache trong RAM, tối đa 1.000 mục.
-5. Thêm vào `/admin/stats`: `cost_usd_today`, `cost_usd_7d` = tổng token × giá.
-6. Nhắc Khiêm bật cảnh báo ngân sách trên trang quản trị của nhà cung cấp API.
-
-**Kiểm tra:** test hạn mức (đặt `DAILY_QUESTION_LIMIT=2`, câu thứ 3 → 429); test cache (hỏi 2 lần cùng câu, `pipeline.answer` chỉ bị gọi 1 lần — đếm bằng monkeypatch).
-
-### T16a – Deploy công khai (tuần 7)
+Model local trả lời từng câu một (Ollama mặc định xử lý ít câu song song). Mỗi câu mất 5–20 giây; 10 người hỏi cùng lúc thì người cuối chờ vài phút. Không tốn tiền, nhưng phải giới hạn tải.
 
 **Các bước:**
 
-1. **Chọn nơi chạy** (bàn với Khiêm trong tuần 5–6). `RETRIEVER=supabase` tải model embedding `BAAI/bge-m3` vào RAM (~2,5–3 GB) ngay trong backend. Gói miễn phí của Render/Railway (512 MB–1 GB) **không chạy nổi**. Các lựa chọn:
-   - Chạy backend trên máy của nhóm (máy Mac dùng cho phương án B) + Cloudflare Tunnel/ngrok mở ra ngoài. Rẻ nhất, máy phải bật suốt.
-   - Thuê host ≥ 4 GB RAM.
-   - Khiêm đổi sang embedding qua API (phải embed lại toàn bộ và đổi số chiều vector; việc lớn, chỉ làm nếu hai cách trên không được).
-2. `CORS_ORIGINS` chỉ còn domain của UI (nếu UI tách riêng), không để `*`.
-3. Giới hạn tần suất theo **cả IP**, không chỉ `session_id` (người dùng đổi `session_id` dễ dàng). Lấy IP thật từ header `X-Forwarded-For` khi chạy sau proxy/tunnel. Dọn `_last_seen` định kỳ để không phình RAM.
-4. Đặt `ADMIN_TOKEN` dài, ngẫu nhiên.
-5. `/api/health` trả đúng provider và model đang dùng; UI hỏi được từ điện thoại qua 4G.
+1. Thêm vào `config.py` + `.env.example`: `MAX_CONCURRENT_ANSWERS` (mặc định `2`), `MAX_WAITING` (mặc định `5`), `DAILY_QUESTION_LIMIT` (mặc định `1000`).
+2. Trong `main.py`: dùng `asyncio.Semaphore(MAX_CONCURRENT_ANSWERS)` bao quanh việc gọi `pipeline.answer`. Đếm số request đang chờ; quá `MAX_WAITING` thì trả ngay 429 `RATE_LIMITED`, `message`: "Chatbot đang bận trả lời nhiều người, bạn thử lại sau ít phút nhé."
+3. Trong lúc chờ đến lượt, UI vẫn hiện "Đang tìm văn bản liên quan…" nên không cần đổi hợp đồng. Muốn hiện "Đang xếp hàng (2 người trước bạn)" thì thêm sự kiện `queue` vào [02-api-contract.md](02-api-contract.md) và sửa `web/app.js` trong cùng PR.
+4. Hạn mức ngày: đếm số câu trong ngày (giờ Việt Nam, UTC+7) trong RAM, vượt thì 429 với thông báo "quay lại vào ngày mai".
+5. Cache: câu hỏi giống hệt (so sau `strip().lower()` và chuẩn hoá NFC), **không có `history`**, trong 24 giờ → trả lại câu trả lời cũ (vẫn phát SSE như bình thường, `answer_id` mới). Lưu trong RAM, tối đa 1.000 mục. Giảm tải cho Mac rất nhiều với các câu hay hỏi.
+6. Thêm vào `/admin/stats`: `waiting_now`, `cache_hits_today`.
+7. Trên Mac, đặt `OLLAMA_NUM_PARALLEL` bằng `MAX_CONCURRENT_ANSWERS` (`launchctl setenv OLLAMA_NUM_PARALLEL 2`, rồi mở lại Ollama). Đo: 2 câu song song có chậm hơn 1 câu nhiều không; chậm quá thì đặt `1`.
+
+**Kiểm tra:** test hàng chờ (monkeypatch `pipeline.answer` thành hàm chờ 1 giây, gửi `MAX_WAITING + MAX_CONCURRENT_ANSWERS + 1` request song song → có request nhận 429); test hạn mức ngày (`DAILY_QUESTION_LIMIT=2`, câu thứ 3 → 429); test cache (hỏi 2 lần cùng câu, `pipeline.answer` chỉ bị gọi 1 lần).
+
+### T16a – Mở công khai (tuần 7)
+
+Backend và Ollama chạy trên máy Mac. Mở **backend** (không phải Ollama) ra Internet bằng Cloudflare Tunnel.
+
+**Các bước:**
+
+1. Trên Mac: cài `cloudflared` (`brew install cloudflared`). Thử nhanh: `cloudflared tunnel --url http://localhost:8000` → in ra một địa chỉ `https://<ngau-nhien>.trycloudflare.com`. Địa chỉ này đổi mỗi lần chạy; cần địa chỉ cố định thì tạo tunnel có tên (cần tài khoản Cloudflare miễn phí và một tên miền).
+2. Mở địa chỉ đó trên điện thoại qua 4G: hỏi được, chữ chạy dần (nếu ra cả cục thì kiểm tra buffering).
+3. Lấy IP thật của người hỏi từ header `CF-Connecting-IP` (hoặc `X-Forwarded-For`) để giới hạn tần suất theo **cả IP**, không chỉ `session_id`. Dọn `_last_seen` định kỳ để không phình RAM.
+4. `CORS_ORIGINS`: nếu UI do backend phục vụ (mặc định) thì đặt đúng domain tunnel; không để `*`.
+5. Đặt `ADMIN_TOKEN` dài, ngẫu nhiên.
+6. Máy Mac phải cắm sạc, không ngủ (`caffeinate -i`), không chạy việc nặng khác trong giờ mở công khai. Ghi giờ mở vào trang Giới thiệu.
+7. `/api/health` trả đúng `ollama` và model đang dùng.
 
 **Bàn giao:** gửi link công khai cho cả nhóm (TV3 cần cho T16b).
 
 ### T17 – Báo cáo phần UI + Backend (tuần 8)
 
-Kiến trúc, các trạng thái UI, cách stream, giới hạn tần suất/chi phí, nơi deploy, số liệu từ `/admin/stats`.
+Kiến trúc, các trạng thái UI, cách stream, giới hạn tần suất và tải, cách mở công khai từ máy Mac, số liệu từ `/admin/stats`.
 
 ## 4. Lỗi thường gặp
 
@@ -145,5 +145,7 @@ Kiến trúc, các trạng thái UI, cách stream, giới hạn tần suất/chi
 | Đổi `.env` mà không thấy tác dụng | Phải tắt và chạy lại uvicorn |
 | Test hỏng vì đọc `.env` thật của bạn | Test phải đặt `os.environ[...]` trước `from app.main import app`; `load_dotenv` không ghi đè biến đã có |
 | Supabase báo `permission denied` | Đang dùng `anon key`; backend phải dùng `service_role key` |
-| Lên host thì không stream, chờ rồi ra cả cục | Host bật nén/gom response; tắt buffering cho `/api/chat` |
-| Host báo hết bộ nhớ khi hỏi câu đầu | Đang tải bge-m3 (xem T16a) |
+| Qua tunnel thì không stream, chờ rồi ra cả cục | Proxy gom response; backend đã đặt `X-Accel-Buffering: no`, kiểm tra cấu hình tunnel |
+| Máy khác không vào được `http://<ip-cua-mac>:8000` | Chưa chạy uvicorn với `--host 0.0.0.0`; tường lửa macOS; Wi-Fi trường chặn (dùng hotspot) |
+| Câu đầu rất chậm hoặc Mac hết RAM | Đang nạp bge-m3 và model Ollama; cộng RAM theo [14-finetune.md, tuần 1](14-finetune.md#tuần-1--chọn-model-và-máy-chạy) |
+| UI báo lỗi `UPSTREAM_ERROR` liên tục | Ollama chưa chạy hoặc sai `LLM_MODEL`; thử `ollama list` |

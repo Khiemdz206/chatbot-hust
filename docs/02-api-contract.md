@@ -14,10 +14,10 @@ File này ghi **mọi định dạng dữ liệu đi từ phần này sang phầ
 | [6. `chunks.jsonl`](#6-datachunkschunksjsonl) | TV2 | Khiêm (fine-tune) | `data/chunk.py`, `finetune/make_sft_dataset.py` |
 | [7. Bảng Supabase](#7-bảng-supabase) | TV2 + TV4 | Khiêm, TV4 | `supabase/migrations/`, `data/embed_upload.py`, `rag/retriever.py`, `store.py` |
 | [8. Bộ đề `golden/*.jsonl`](#8-bộ-đề-evalgoldenjsonl) | TV3 | Khiêm (recall@k, lọc dataset) | `eval/run_eval.py`, `finetune/make_sft_dataset.py` |
-| [9. Kết quả eval](#9-kết-quả-eval-evalresults) | TV3 | cả nhóm | `eval/run_eval.py`, `eval/judge.py` |
-| [10. Dataset SFT](#10-dataset-sft-finetunedatasetssftjsonl) | Khiêm | Khiêm (Colab) | `finetune/make_sft_dataset.py`, `finetune/train_lora_colab.py` |
+| [9. Kết quả eval](#9-kết-quả-eval-evalresults) | TV3 | cả nhóm | `eval/run_eval.py`, `eval/judge.py`, `eval/RUBRIC.md` |
+| [10. Dataset SFT](#10-dataset-sft-finetunedatasetssftjsonl) | Khiêm (agent cả nhóm viết) | Khiêm (Colab) | `finetune/make_sft_dataset.py`, `finetune/TEACHER.md`, `finetune/train_lora_colab.py` |
 | [11. Mã chủ đề](#11-mã-chủ-đề-topic) | – | cả nhóm | `data/sources.yaml`, `eval/golden/` |
-| [12. Biến `.env`](#12-biến-env) | – | cả nhóm | `.env.example`, `backend/app/config.py`, `common/llm.py` |
+| [12. Biến `.env`](#12-biến-env) | – | cả nhóm | `.env.example`, `backend/app/config.py` |
 
 ## 1. `POST /api/chat`
 
@@ -89,7 +89,7 @@ Script eval dùng cách này.
 
 | Endpoint | Trả về | Ghi chú |
 | --- | --- | --- |
-| `GET /api/health` | `{"status": "ok", "llm_provider": "anthropic", "llm_model": "claude-opus-5-5", "retriever": "supabase"}` | Kiểm tra backend đang chạy cấu hình nào |
+| `GET /api/health` | `{"status": "ok", "llm_provider": "ollama", "llm_model": "chatbot-hust", "retriever": "supabase"}` | Kiểm tra backend đang chạy cấu hình nào |
 | `POST /admin/reindex` | `{"ok": true, "message": "..."}` | Header `X-Admin-Token: <ADMIN_TOKEN>`. Chưa cài (T9) |
 | `GET /admin/stats` | xem [11-backend.md, T12b](11-backend.md#t12b--thống-kê-cho-nhóm-tuần-4) | Header `X-Admin-Token`. Chưa cài (T12b) |
 | `GET /docs` | Trang thử API do FastAPI tự sinh | |
@@ -103,7 +103,7 @@ Mọi lỗi HTTP do backend tự trả có body `{"code": "...", "message": "...
 | --- | --- | --- | --- |
 | 401 | `UNAUTHORIZED` | Sai `X-Admin-Token` | – |
 | 422 | (body mặc định của FastAPI, có trường `detail`) | `message` rỗng hoặc quá dài | "Câu hỏi không hợp lệ" |
-| 429 | `RATE_LIMITED` | Cùng `session_id` hỏi lại trong < `MIN_SECONDS_BETWEEN_QUESTIONS` giây; (sau T19) vượt hạn mức ngày | Hiện `message` từ backend |
+| 429 | `RATE_LIMITED` | Cùng `session_id` hỏi lại trong < `MIN_SECONDS_BETWEEN_QUESTIONS` giây; (sau T19) hàng chờ đầy hoặc vượt hạn mức ngày | Hiện `message` từ backend |
 | 502 / sự kiện `error` | `UPSTREAM_ERROR` | Model hoặc CSDL lỗi | Thông báo + nút "Thử lại" |
 
 ## 5. `pipeline.answer()`: hợp đồng giữa Backend và AI
@@ -123,7 +123,7 @@ Các sự kiện, đúng thứ tự:
 | --- | --- | --- |
 | `"token"` | ≥ 1 | `text: str` |
 | `"sources"` | 1 | `items: list[dict]`, mỗi phần tử `{n, title, section, url, effective_date}` (giống mục 1) |
-| `"meta"` | 1, cuối cùng | `refused: bool`, `rewritten: str`, `model: str`, `chunk_ids: list[str]` (rỗng khi refused), `cited: list[int]` (khi không refused), `usage: {"input_tokens": int, "output_tokens": int} \| None` (**thêm ở T19**, mock trả `None`) |
+| `"meta"` | 1, cuối cùng | `refused: bool`, `rewritten: str`, `model: str`, `chunk_ids: list[str]` (rỗng khi refused), `cited: list[int]` (khi không refused) |
 
 - Khiêm được sửa mọi thứ bên trong `backend/app/rag/` miễn giữ đúng bảng trên.
 - Thêm trường vào `meta` thì được (backend bỏ qua trường lạ). Bỏ hoặc đổi tên trường thì phải báo TV4.
@@ -210,8 +210,9 @@ Các dòng có `id` bắt đầu bằng `MAU-` là mẫu, xoá khi có câu th�
 ## 9. Kết quả eval (`eval/results/`)
 
 - `run_eval.py` → `results/<YYYYMMDD-HHMM>_<commit>.jsonl`: mỗi dòng = dòng bộ đề + `system_answer`, `system_sources`, `system_refused`, `error`, `latency_ms`.
-- `judge.py` → `<cùng tên>.judged.jsonl` (thêm `scores`, `can_cham_tay`) và `<cùng tên>.report.md`.
-- `scores` có dạng `{"judge1": {"ours": {...}, "hustva": {...}}, "judge2": {...}}`, mỗi `{...}` là `{"correct": 0|1|2, "hallucination": bool, "cites_source": bool, "note": str}`.
+- `judge.py prepare` → `<cùng tên>.judge_tasks.jsonl` (mỗi dòng `{id, question, in_scope, reference_answer, reference_source, A, B}`, A/B đảo ngẫu nhiên) và `<cùng tên>.judge_key.json` (`{id: {"ours": "A"|"B", "hustva": "A"|"B"}}`).
+- Agent chấm theo `eval/RUBRIC.md` → `<cùng tên>.judge_scores.jsonl`: mỗi dòng `{"id", "A": {...}, "B": {...}, "unsure": bool}`, mỗi `{...}` là `{"correct": 0|1|2, "hallucination": bool, "cites_source": bool, "note": str}`.
+- `judge.py report` → `<cùng tên>.judged.jsonl` (thêm `scores: {"ours": {...}, "hustva": {...}}` hoặc `null` nếu chưa chấm, và `can_cham_tay`) và `<cùng tên>.report.md`.
 - `eval/results/` không lên Git. Báo cáo dùng để so sánh thì chép vào `eval/reports/` và commit.
 
 ## 10. Dataset SFT (`finetune/datasets/sft.jsonl`)
@@ -224,6 +225,15 @@ Các dòng có `id` bắt đầu bằng `MAU-` là mẫu, xoá khi có câu th�
 ```
 
 Phần `user` được tạo bằng đúng `build_messages()` trong `backend/app/rag/prompts.py`. Đổi `SYSTEM_PROMPT` hoặc `format_context()` thì dataset cũ hết dùng được.
+
+File trung gian (agent đọc/ghi, chi tiết trong `finetune/TEACHER.md`):
+
+| File | Ai ghi | Mỗi dòng |
+| --- | --- | --- |
+| `datasets/q_tasks/batch_XXX.jsonl` | script (`questions`) | `{chunk_id, title, section, content}` |
+| `datasets/q_tasks/batch_XXX.out.jsonl` | agent | `{chunk_id, questions: [str]}` |
+| `datasets/a_tasks/batch_XXX.jsonl` | script (`contexts`) | `{task_id, answerable, user}` |
+| `datasets/a_tasks/batch_XXX.out.jsonl` | agent | `{task_id, answer}` |
 
 ## 11. Mã chủ đề (`topic`)
 
@@ -247,12 +257,10 @@ File `.env` ở thư mục gốc, mẫu là `.env.example`. Thêm biến mới: 
 
 | Biến | Ai dùng | Ý nghĩa |
 | --- | --- | --- |
-| `LLM_PROVIDER`, `LLM_MODEL`, `MAX_ANSWER_TOKENS` | backend | `mock` \| `anthropic` \| `openai_compat` |
-| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENAI_BASE_URL` | backend, `common/llm.py` | Key dùng chung |
+| `LLM_PROVIDER`, `LLM_MODEL`, `MAX_ANSWER_TOKENS` | backend | `mock` \| `ollama`; `LLM_MODEL` vd. `qwen2.5:7b` (model gốc) hoặc `chatbot-hust` (fine-tune) |
+| `LLM_BASE_URL`, `LLM_API_KEY` | backend | Địa chỉ Ollama (mặc định `http://localhost:11434/v1`); key chỉ cần khi dùng vLLM có `--api-key` |
 | `RETRIEVER`, `TOP_K`, `EMBED_MODEL` | backend, `data/embed_upload.py` | `mock` \| `supabase` |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | backend, `data/` | Dùng **service_role key** |
 | `CORS_ORIGINS`, `MIN_SECONDS_BETWEEN_QUESTIONS`, `ADMIN_TOKEN` | backend | |
-| `TEACHER_PROVIDER`, `TEACHER_MODEL` | `finetune/make_sft_dataset.py` | Model sinh dữ liệu |
-| `JUDGE1_*`, `JUDGE2_*` (`_PROVIDER`, `_MODEL`, `_BASE_URL`, `_API_KEY`) | `eval/judge.py` | Hai giám khảo, nên khác hãng |
-| `REWRITE_PROVIDER`, `REWRITE_MODEL` | `rag/pipeline.py` (thêm ở T10) | Model rẻ để viết lại câu hỏi |
-| `DAILY_QUESTION_LIMIT` | backend (thêm ở T19) | Hạn mức câu hỏi mỗi ngày |
+| `REWRITE_MODEL` | `rag/rewrite.py` (thêm ở T10) | Model Ollama nhỏ để viết lại câu hỏi |
+| `MAX_CONCURRENT_ANSWERS`, `MAX_WAITING`, `DAILY_QUESTION_LIMIT` | backend (thêm ở T19) | Giới hạn tải cho máy Mac |

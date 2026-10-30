@@ -49,7 +49,7 @@ git push -u origin ui/t7-hien-thi-nguon
 | AI / RAG | `ai/` | `ai/t10-rerank` |
 | Data | `data/` | `data/t4-quy-che-dao-tao` |
 | Fine-tune | `ft/` | `ft/t13-sinh-dataset` |
-| Eval | `eval/` | `eval/t11-llm-judge` |
+| Eval | `eval/` | `eval/t11-kiem-giam-khao` |
 | Tài liệu | `docs/` | `docs/cap-nhat-ke-hoach` |
 
 ## Khi bị xung đột (conflict)
@@ -68,7 +68,7 @@ Không chắc giữ phần nào thì hỏi người viết phần kia trong nhó
 
 ## Không bao giờ commit
 
-- File `.env` và mọi API key. Lỡ commit: báo Lead ngay để **đổi key**, xoá khỏi lịch sử không đủ.
+- File `.env` và mọi key (Supabase `service_role`, `ADMIN_TOKEN`). Lỡ commit: báo Lead ngay để **đổi key**, xoá khỏi lịch sử không đủ.
 - Dữ liệu crawl (`data/raw`, `data/clean`), file model (`.gguf`, thư mục LoRA): quá nặng, đã có trong `.gitignore`. Chia sẻ qua Google Drive của nhóm.
 
 ## Họp nhóm

@@ -18,15 +18,12 @@ def _get(name: str, default: str = "") -> str:
 
 class Settings:
     # --- Model sinh câu trả lời (generator) ---
-    # mock          : không gọi model nào, trả lời giả để dev UI/BE
-    # anthropic     : gọi API Anthropic (vd. Opus 5.5)
-    # openai_compat : gọi bất kỳ API nào theo chuẩn OpenAI:
-    #                 OpenAI, Ollama, vLLM (model fine-tune của nhóm)...
+    # mock   : không gọi model nào, trả lời giả để dev UI/BE
+    # ollama : gọi model chạy local bằng Ollama (API chuẩn OpenAI)
     llm_provider: str = _get("LLM_PROVIDER", "mock")
     llm_model: str = _get("LLM_MODEL", "")
-    anthropic_api_key: str = _get("ANTHROPIC_API_KEY")
-    openai_base_url: str = _get("OPENAI_BASE_URL", "https://api.openai.com/v1")
-    openai_api_key: str = _get("OPENAI_API_KEY")
+    llm_base_url: str = _get("LLM_BASE_URL", "http://localhost:11434/v1")
+    llm_api_key: str = _get("LLM_API_KEY")   # Ollama không cần; vLLM thì cần nếu đặt --api-key
     max_answer_tokens: int = int(_get("MAX_ANSWER_TOKENS", "1024"))
 
     # --- Truy xuất ---

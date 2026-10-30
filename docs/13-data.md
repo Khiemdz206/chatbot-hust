@@ -165,11 +165,11 @@ where c.content ilike '%học vượt%';
 delete from documents where url = '<url>';
 ```
 
-## 5. Xử lý PDF scan bằng model mạnh
+## 5. Xử lý PDF scan bằng AI
 
 `extract.py` in `CẦN XỬ LÝ TAY (PDF scan): <id>` khi PDF gần như không có lớp chữ. Khi đó:
 
-1. Mở chat với model mạnh nhóm có, đính kèm file `data/raw/<id>.pdf`.
+1. Mở một chatbot AI đọc được file PDF, đính kèm file `data/raw/<id>.pdf`.
 2. Yêu cầu: *"Chép lại nguyên văn văn bản này dưới dạng markdown. Mỗi tiêu đề Chương, Điều nằm trên một dòng riêng, bắt đầu bằng 'Chương ...' hoặc 'Điều ...'. Giữ nguyên số liệu và bảng (dạng | ô | ô |). Không tóm tắt, không thêm chữ."*
 3. **So từng bảng, từng con số với bản gốc.** Model có thể đọc sai số.
 4. Lưu thành `data/clean/<id>.md`, chép `data/raw/<id>.meta.json` thành `data/clean/<id>.meta.json`.

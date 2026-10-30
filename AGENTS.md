@@ -1,6 +1,6 @@
 # Hướng dẫn cho AI agent làm việc trong repo này
 
-File này dành cho trợ lý AI (Claude Code, Cursor, Copilot, Codex...) mà mỗi thành viên dùng. Đọc hết file này trước khi làm bất cứ việc gì.
+File này dành cho AI agent (trợ lý AI lập trình) mà mỗi thành viên dùng. Đọc hết file này trước khi làm bất cứ việc gì.
 
 ## 1. Bạn đang giúp ai
 
@@ -8,7 +8,7 @@ Nhóm có 4 người. Mỗi người sở hữu một phần và một file hư�
 
 | Người | Phần | File hướng dẫn phải đọc | Được sửa | Không được sửa (trừ khi người dùng bảo rõ) |
 | --- | --- | --- | --- | --- |
-| Khiêm (Lead) | AI / RAG + Fine-tune | [docs/12-ai-rag.md](docs/12-ai-rag.md), [docs/14-finetune.md](docs/14-finetune.md) | `backend/app/rag/`, `finetune/`, `common/`; thêm biến AI vào `backend/app/config.py` + `.env.example`; file mới trong `supabase/migrations/` (báo TV2, TV4) | `web/`, `backend/app/main.py`, `backend/app/store.py`, `data/` |
+| Khiêm (Lead) | AI / RAG + Fine-tune | [docs/12-ai-rag.md](docs/12-ai-rag.md), [docs/14-finetune.md](docs/14-finetune.md) | `backend/app/rag/`, `finetune/`; thêm biến AI vào `backend/app/config.py` + `.env.example`; file mới trong `supabase/migrations/` (báo TV2, TV4) | `web/`, `backend/app/main.py`, `backend/app/store.py`, `data/` |
 | TV2 | Data | [docs/13-data.md](docs/13-data.md) | `data/`, `supabase/migrations/` (thêm file mới) | `backend/`, `web/`, `eval/` |
 | TV3 | Eval | [docs/15-eval.md](docs/15-eval.md) | `eval/` | mọi thứ ngoài `eval/` |
 | TV4 | UI + Backend | [docs/10-ui.md](docs/10-ui.md), [docs/11-backend.md](docs/11-backend.md) | `web/`, `backend/app/` **trừ** `backend/app/rag/`, `backend/tests/`, `supabase/migrations/` (thêm file mới), `.env.example` | `backend/app/rag/`, `data/`, `eval/`, `finetune/` |
@@ -19,7 +19,7 @@ Luôn đọc thêm [docs/02-api-contract.md](docs/02-api-contract.md): định d
 
 1. **Chỉ sửa file trong phạm vi của người dùng** (bảng trên). Cần đổi file của người khác thì dừng lại, viết rõ cần đổi gì và vì sao để người dùng nhắn cho chủ file.
 2. **Không đổi hợp đồng** trong `docs/02-api-contract.md` (tên trường, kiểu dữ liệu, tên sự kiện SSE, tên hàm `pipeline.answer`) nếu người dùng không bảo. Nếu được bảo đổi, sửa `docs/02-api-contract.md` trong cùng PR.
-3. **Không commit**: `.env`, API key, `data/raw/`, `data/clean/`, `data/chunks/`, `finetune/datasets/`, file model (`.gguf`, thư mục `*-lora`), `eval/results/`. Đã có trong `.gitignore`, đừng sửa `.gitignore` để bỏ qua.
+3. **Không commit**: `.env`, key Supabase, `data/raw/`, `data/clean/`, `data/chunks/`, `finetune/datasets/`, file model (`.gguf`, thư mục `*-lora`), `eval/results/`. Đã có trong `.gitignore`, đừng sửa `.gitignore` để bỏ qua.
 4. **Không push thẳng vào `main`.** Tạo nhánh theo [CONTRIBUTING.md](CONTRIBUTING.md), commit, rồi để người dùng tự mở PR (hoặc dùng `gh pr create` nếu họ bảo).
 5. **Không bịa nội dung quy chế của trường.** Mọi số liệu, điều kiện học vụ phải lấy từ văn bản gốc mà người dùng đưa hoặc đã có trong `data/`.
 6. **Không viết script tự động hỏi HustVA** hoặc crawl mạnh trang của trường. Thu đáp án HustVA là việc làm tay.
@@ -44,7 +44,16 @@ pytest -q                          # phải ra: 6 passed
 - Đổi `.env` thì phải tắt và chạy lại uvicorn.
 - `backend/app/config.py` là nơi duy nhất đọc biến môi trường của backend. Thêm biến mới: thêm vào `config.py` **và** `.env.example`.
 
-## 4. Cách làm một task
+Nhóm **không dùng API model trả tiền**. Chatbot chạy bằng Ollama (`LLM_PROVIDER=ollama`). Đừng thêm code gọi API của OpenAI, Anthropic hay dịch vụ tương tự.
+
+## 4. Bạn có thể được giao làm "teacher" hoặc "giám khảo"
+
+Ai trong nhóm cũng có thể nhờ bạn làm hai việc này, kể cả khi không phải phần của họ:
+
+- **Sinh dữ liệu fine-tune:** người dùng giao một file lô trong `finetune/datasets/q_tasks/` hoặc `a_tasks/`. Đọc [finetune/TEACHER.md](finetune/TEACHER.md) và làm đúng lô đó.
+- **Chấm điểm eval:** người dùng giao một file `eval/results/*.judge_tasks.jsonl`. Đọc [eval/RUBRIC.md](eval/RUBRIC.md) và chấm đúng các dòng được giao. Không mở `*.judge_key.json` hay file kết quả gốc.
+
+## 5. Cách làm một task
 
 1. Mở file hướng dẫn của người dùng, tìm task theo mã (vd. `T7`). Mỗi task có: Mục tiêu, Hiện trạng code, Các bước, Kiểm tra, Bàn giao.
 2. Đọc các file trong mục "Hiện trạng code" trước khi sửa.

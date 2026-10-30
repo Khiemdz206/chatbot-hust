@@ -4,8 +4,7 @@ uvicorn[standard]>=0.30
 python-dotenv>=1.0
 pydantic>=2.7
 
-# Gọi model (phương án A hoặc B)
-anthropic>=0.40
+# Gọi model chạy bằng Ollama (API chuẩn OpenAI)
 openai>=1.50
 
 # Khi RETRIEVER=supabase

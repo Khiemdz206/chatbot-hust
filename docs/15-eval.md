@@ -7,30 +7,35 @@ Việc của bạn: làm **bài kiểm tra** cho chatbot. Bạn không viết t�
 Phần này phục vụ ba việc:
 
 1. **Chứng minh mục tiêu dự án.** Đích của nhóm là "đúng ngang hoặc hơn HustVA". Câu đó chỉ có giá trị khi có số liệu, và số liệu đó do bạn tạo ra: cùng một bộ đề, hỏi cả hai hệ thống, chấm cùng một cách.
-2. **Cho nhóm biết thay đổi nào có ích.** Khiêm đổi prompt, TV2 đổi cách cắt văn bản: điểm tăng thì giữ, giảm thì bỏ. Mọi PR của Data, AI, Fine-tune phải kèm điểm trước/sau do bạn chạy.
+2. **Cho nhóm biết thay đổi nào có ích.** Khiêm đổi prompt hay train model mới, TV2 đổi cách cắt văn bản: điểm tăng thì giữ, giảm thì bỏ. Mọi PR của Data, AI, Fine-tune phải kèm điểm trước/sau do bạn chạy. Quan trọng nhất: chứng minh **model fine-tune hơn model gốc**.
 3. **Chỉ ra ai cần sửa gì.** Với mỗi câu sai, bạn xác định sai vì **thiếu dữ liệu** (gửi TV2), **tìm sai đoạn** hay **viết sai** (gửi Khiêm).
 
-```
-Bộ đề (câu hỏi + đáp án đúng + câu trả lời HustVA)
-   ──► hỏi chatbot mình ──► 2 giám khảo AI chấm mình và HustVA ──► báo cáo điểm + câu sai vì đâu ──► gửi TV2 / Khiêm sửa ──► chạy lại
-```
-
-Phần của bạn bắt đầu **sớm nhất** (tuần 1), vì không có bộ đề thì không ai đo được gì.
+Giám khảo là **AI agent của bạn**, không gọi API. Script chuẩn bị đề, chia lô và kiểm tra kết quả; agent đọc từng câu và chấm. Cách làm từng bước: [mục 4](#4-chấm-điểm-bằng-ai-agent-từng-bước).
 
 ## 1. Đường đi của eval
 
 ```
-eval/golden/golden_v1.jsonl ──run_eval.py──► eval/results/<thời gian>_<commit>.jsonl ──judge.py──► .judged.jsonl + .report.md
- (câu hỏi + đáp án chuẩn                gọi POST /api/chat?stream=false             JUDGE1 và JUDGE2 chấm "mình" và "HustVA"
-  + đáp án HustVA, bạn viết)            của backend đang chạy                       mà không biết câu nào của ai
+golden/golden_v1.jsonl ──run_eval.py──► results/<run>.jsonl
+ (câu hỏi + đáp án chuẩn      hỏi chatbot qua           │
+  + câu trả lời HustVA)       POST /api/chat            ▼
+                                     judge.py prepare ──► <run>.judge_tasks.jsonl (A/B đảo ngẫu nhiên)
+                                                        │   + <run>.judge_key.json (A/B nào của ai)
+                                                        ▼
+                                     judge.py status  ──► in lời nhắn giao lô 25 câu cho agent
+                                                        ▼
+                                     agent đọc RUBRIC.md, chấm ──► <run>.judge_scores.jsonl
+                                                        │   (lặp status → agent đến khi đủ)
+                                     judge.py report  ──► <run>.judged.jsonl + <run>.report.md
 ```
 
 | File | Việc | Ghi chú |
 | --- | --- | --- |
 | `golden/golden_v1.jsonl` | Bộ đề | Hiện có 3 dòng mẫu `MAU-001..003`. Định dạng: [02-api-contract.md mục 8](02-api-contract.md#8-bộ-đề-evalgoldenjsonl) |
-| `run_eval.py --golden <file> --api <url> [--limit N]` | Hỏi backend từng câu | Gửi `session_id: "eval"`. Câu lỗi ghi `error`, không dừng. Tên file kết quả có mã commit hiện tại. |
-| `judge.py <file kết quả>` | Chấm | Mỗi câu: đảo ngẫu nhiên vị trí A/B, gọi `judge1` và `judge2`, chấm `correct` 0/1/2, `hallucination`, `cites_source`. Hai giám khảo lệch `correct` → `can_cham_tay: true`. Viết báo cáo tổng + theo chủ đề + danh sách câu mình sai. |
-| `common/llm.py` (dùng chung, không sửa) | Gọi model | Đọc `JUDGE1_PROVIDER`, `JUDGE1_MODEL`, `JUDGE1_BASE_URL`, `JUDGE1_API_KEY` (tương tự `JUDGE2_*`) |
+| `run_eval.py --golden <file> --api <url> [--limit N]` | Hỏi chatbot từng câu | Gửi `session_id: "eval"`. Câu lỗi ghi `error`, không dừng. Tên file kết quả có mã commit hiện tại |
+| `judge.py prepare <file kết quả>` | Tạo đề cho giám khảo | Mỗi câu: câu trả lời của mình và HustVA đặt ngẫu nhiên vào A/B để giám khảo không biết của ai |
+| `judge.py status <file kết quả> [--paste]` | Giao lô và kiểm tra | Đếm câu đã chấm, báo dòng agent ghi sai định dạng, in sẵn lời nhắn giao lô tiếp theo |
+| `RUBRIC.md` | Hướng dẫn chấm cho agent | `correct` 0/1/2, `hallucination`, `cites_source`, `note`, `unsure`. Muốn đổi cách chấm thì sửa file này |
+| `judge.py report <file kết quả>` | Gom điểm, viết báo cáo | Câu `unsure` hoặc chưa được chấm → `can_cham_tay: true`. Báo cáo: bảng tổng, theo chủ đề, danh sách câu mình sai |
 
 `eval/results/` không lên Git. Báo cáo dùng để so sánh thì chép `.report.md` vào `eval/reports/` (tạo thư mục) và commit.
 
@@ -43,15 +48,21 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Để chạy `run_eval.py` cần một backend đang chạy (xem README). Trong `.env` ở thư mục gốc đặt `MIN_SECONDS_BETWEEN_QUESTIONS=0`, nếu không backend trả 429 cho mọi câu sau câu đầu.
+`run_eval.py` cần một backend đang chạy. Bạn có hai cách:
+- Gọi backend trên máy Mac của nhóm (cùng Wi-Fi): `--api http://<ip-cua-mac>:8000`. Cách này dùng đúng model thật.
+- Chạy backend mock trên máy mình (xem README) để thử script.
 
-Thử với mock (không tốn tiền):
+Backend phải đặt `MIN_SECONDS_BETWEEN_QUESTIONS=0` trong `.env`, nếu không mọi câu sau câu đầu bị 429. Với model local, mỗi câu mất 5–20 giây, 200 câu khoảng 30–60 phút.
+
+Thử với mock:
 
 ```bash
 # terminal 1, thư mục backend/
 uvicorn app.main:app --port 8000
 # terminal 2, thư mục eval/
 python run_eval.py --limit 3
+python judge.py prepare results/<file vừa tạo>.jsonl
+python judge.py status results/<file vừa tạo>.jsonl
 ```
 
 ## 3. Task
@@ -62,18 +73,18 @@ python run_eval.py --limit 3
 
 **Các bước (tuần 1):**
 
-1. Gom câu hỏi thật: hỏi bạn bè, đọc câu hay gặp trên các nhóm sinh viên (chỉ lấy nội dung câu hỏi, không lấy tên người hỏi). Nhờ model mạnh gợi thêm câu cho chủ đề còn thiếu.
+1. Gom câu hỏi thật: hỏi bạn bè, đọc câu hay gặp trên các nhóm sinh viên (chỉ lấy nội dung câu hỏi, không lấy tên người hỏi). Nhờ agent gợi thêm câu cho chủ đề còn thiếu.
 2. Phân bổ: mỗi chủ đề trong phạm vi (mã ở [02-api-contract.md mục 11](02-api-contract.md#11-mã-chủ-đề-topic)) ít nhất 10 câu; ~15 câu `ngoai_pham_vi` (nấu ăn, giải bài tập, hỏi điểm cá nhân, chính trị...); ~40% `easy`, 40% `medium`, 20% `hard`.
-3. Viết lại câu cho giống sinh viên nhắn: viết tắt (đkhp, tc, CPA), thiếu dấu, hỏi cộc lốc. Khoảng 10 câu là câu hỏi tiếp nối ("thế còn học lại thì sao?") — ghi riêng, dùng sau khi `run_eval.py` hỗ trợ `history`.
+3. Viết lại câu cho giống sinh viên nhắn: viết tắt (đkhp, tc, CPA), thiếu dấu, hỏi cộc lốc.
 4. Đặt `id` theo tiền tố chủ đề (`DKHP-001`, `HP-001`...). Xoá 3 dòng `MAU-`.
-5. **Thu đáp án HustVA:** chia 100 câu cho 4 người (mỗi người 25). Hỏi tay trên giao diện HustVA, chép nguyên văn vào `hustva_answer`, chụp màn hình lưu Drive, ghi `collected_at` và `collected_by`. **Không viết script tự động hỏi HustVA.** Cách dễ nhất: tạo Google Sheet có cột giống trường JSON, cả nhóm điền, rồi xuất (mục 4).
+5. **Thu đáp án HustVA:** chia 100 câu cho 4 người (mỗi người 25). Hỏi tay trên giao diện HustVA, chép nguyên văn vào `hustva_answer`, chụp màn hình lưu Drive, ghi `collected_at` và `collected_by`. **Không viết script tự động hỏi HustVA.** Cách dễ nhất: tạo Google Sheet có cột giống trường JSON, cả nhóm điền, rồi chuyển sang JSONL (mục 5).
 
 **Các bước (tuần 2):**
 
-6. Mỗi câu trong phạm vi: tìm trong văn bản chính thức (danh sách URL lấy từ `data/sources.yaml` của TV2), viết `reference_answer` ngắn và `reference_source` **đúng dạng `<url>#Điều <số>`** (url trùng với url trong `sources.yaml`). Khiêm dùng trường này để đo truy xuất tự động, sai dạng là script đo không chạy được.
+6. Mỗi câu trong phạm vi: tìm trong văn bản chính thức (danh sách URL lấy từ `data/sources.yaml` của TV2), viết `reference_answer` ngắn và `reference_source` **đúng dạng `<url>#Điều <số>`** (url trùng với url trong `sources.yaml`). Khiêm dùng trường này để đo truy xuất tự động, sai dạng thì script đo không chạy được.
 7. Câu không tìm được văn bản nào: ghi `reference_source: ""` và gửi danh sách cho TV2 để bổ sung nguồn.
 
-**Kiểm tra:** chạy script kiểm định dạng (nhờ agent viết thành `eval/check_golden.py` nếu chưa có):
+**Kiểm tra:** nhờ agent viết `eval/check_golden.py`, rồi chạy:
 
 ```bash
 python check_golden.py golden/golden_v1.jsonl
@@ -85,64 +96,121 @@ Script phải kiểm: mỗi dòng là JSON hợp lệ; đủ trường; `id` kh�
 
 ### T8 – Chạy eval lần đầu (tuần 3)
 
-**Mục tiêu:** có báo cáo đầu tiên so sánh hệ thống mình với HustVA trên chủ đề quy chế.
+**Mục tiêu:** báo cáo đầu tiên so sánh chatbot (đang chạy **model gốc** qua Ollama) với HustVA trên chủ đề quy chế. Đây là mốc để sau này đo model fine-tune.
 
-**Cần trước:** T2, Khiêm báo backend chạy thật được (T6).
+**Cần trước:** T2; Khiêm báo backend trên Mac chạy thật được (T6).
 
 **Các bước:**
 
-1. Trong `.env`: cấu hình thật Khiêm gửi (`LLM_PROVIDER`, `LLM_MODEL`, key, `RETRIEVER=supabase`, Supabase), `MIN_SECONDS_BETWEEN_QUESTIONS=0`.
-2. Đặt hai giám khảo khác hãng, vd.:
-   ```env
-   JUDGE1_PROVIDER=anthropic
-   JUDGE1_MODEL=claude-opus-5-5
-   JUDGE2_PROVIDER=openai_compat
-   JUDGE2_MODEL=<model của hãng khác>
-   JUDGE2_BASE_URL=<địa chỉ API của hãng đó>
-   ```
-3. Chạy backend, rồi `curl http://localhost:8000/api/health`: phải thấy đúng provider, model, `retriever: supabase`.
-4. `python run_eval.py --limit 5`, mở file trong `results/` xem 5 câu trả lời có hợp lý không. Rồi chạy đủ: `python run_eval.py`.
-5. `python judge.py results/<file>.jsonl`. Ước chi phí trước: số câu × 2 giám khảo × ~2.000 token.
-6. Mở `.report.md`, xử lý tay các câu `can_cham_tay` (mục 5).
-7. Chép báo cáo vào `eval/reports/<ngày>-<cấu hình>.report.md`, ghi ở đầu file: commit, `LLM_MODEL`, `TOP_K`, số câu.
+1. `curl http://<ip-cua-mac>:8000/api/health`: phải thấy `llm_provider: ollama`, đúng `llm_model`, `retriever: supabase`.
+2. `python run_eval.py --api http://<ip-cua-mac>:8000 --limit 5`, mở file trong `results/` xem 5 câu trả lời có hợp lý không. Rồi chạy đủ.
+3. Chấm bằng AI agent theo đúng [mục 4](#4-chấm-điểm-bằng-ai-agent-từng-bước): `prepare` → lặp `status` + giao lô cho agent → `report`.
+4. Xử lý các câu `can_cham_tay` (mục 6).
+5. Chép báo cáo vào `eval/reports/<ngày>-<model>.report.md`, ghi ở đầu file: commit, `LLM_MODEL`, `TOP_K`, số câu.
 
-**Kiểm tra:** báo cáo có bảng tổng + bảng theo chủ đề; số câu `LỖI` trong `run_eval` bằng 0.
+**Kiểm tra:** báo cáo có bảng tổng + bảng theo chủ đề; không còn câu `LỖI` trong `run_eval`.
 
 **Bàn giao:** trình bày báo cáo ở buổi họp cuối tuần 3.
 
 ### T11 – Tin được giám khảo và bộ đề v2 (tuần 4–5)
 
-**Mục tiêu:** (1) chứng minh giám khảo LLM chấm khớp người ≥ 85%; (2) bộ đề ~200 câu; (3) mỗi câu sai có nguyên nhân và người chịu trách nhiệm sửa.
+**Mục tiêu:** (1) chứng minh agent chấm khớp người ≥ 85%; (2) bộ đề ~200 câu; (3) mỗi câu sai có nguyên nhân và người chịu trách nhiệm sửa.
 
 **Các bước:**
 
-1. **Chấm tay:** viết `eval/export_manual.py <file .judged.jsonl> --n 40` xuất 40 câu ngẫu nhiên ra CSV với cột `id, question, reference_answer, system_answer, hustva_answer, human_ours, human_hustva`. Chấm `human_*` theo **đúng rubric** trong `RUBRIC` ở `judge.py` (0/1/2). Không nhìn điểm của giám khảo trước khi chấm.
-2. Viết `eval/agreement.py <csv> <file .judged.jsonl>`: tính % câu mà điểm người = điểm từng giám khảo. ≥ 85% thì tin được. Thấp hơn: đọc các câu lệch, sửa `RUBRIC` cho rõ hơn, chấm lại, ghi số trước/sau vào PR.
-3. **Phân loại lỗi:** viết `eval/classify_errors.py <file .judged.jsonl>`. Với mỗi câu `correct` của mình = 0 hoặc 1:
-   - So `reference_source` với `system_sources` (cùng `url`, và `section` chứa đúng `Điều <số>`).
+1. **Chấm tay:** nhờ agent viết `eval/export_manual.py <file .judged.jsonl> --n 40`: xuất 40 câu ngẫu nhiên ra CSV với cột `id, question, reference_answer, system_answer, hustva_answer, human_ours, human_hustva`. Bạn chấm `human_*` theo **đúng** `RUBRIC.md` (0/1/2), không nhìn điểm của agent trước.
+2. Nhờ agent viết `eval/agreement.py <csv> <file .judged.jsonl>`: tính % câu mà điểm người = điểm agent. ≥ 85% thì tin được. Thấp hơn: đọc các câu lệch, sửa `RUBRIC.md` cho rõ, chấm lại, ghi số trước/sau vào PR.
+3. **Phân loại lỗi:** nhờ agent viết `eval/classify_errors.py <file .judged.jsonl>`. Với mỗi câu `correct` của mình = 0 hoặc 1:
+   - So `reference_source` với `system_sources` (cùng `url`, `section` chứa đúng `Điều <số>`).
    - Có nguồn đúng trong `system_sources` → **sinh_sai** (gửi Khiêm: prompt/model).
    - Không có, nhưng văn bản có trên Supabase → **truy_xuat_sai** (gửi Khiêm: retriever).
    - `reference_source` rỗng hoặc văn bản chưa có trong `sources.yaml` → **thieu_du_lieu** (gửi TV2).
    - Xuất bảng `eval/reports/<run>-loi.md`: id, câu hỏi, nguyên nhân, người sửa.
-4. **Bộ đề v2:** tạo `golden/golden_v2.jsonl` = toàn bộ v1 + ~100 câu mới. Nguồn câu mới: log `chat_logs` của người dùng thật (bỏ thông tin cá nhân), câu hỏi khó mà nhóm phát hiện. Thu đáp án HustVA như T2.
+4. **Bộ đề v2:** `golden/golden_v2.jsonl` = toàn bộ v1 + ~100 câu mới (từ `chat_logs` của người dùng thật, bỏ thông tin cá nhân; câu khó nhóm phát hiện). Thu đáp án HustVA như T2.
 
-**Kiểm tra:** `python check_golden.py golden/golden_v2.jsonl` không lỗi; có file `agreement` ≥ 85% hoặc giải thích vì sao thấp.
+**Kiểm tra:** `python check_golden.py golden/golden_v2.jsonl` không lỗi; agreement ≥ 85% hoặc có giải thích vì sao thấp.
 
-### Chạy eval cho phương án B (tuần 6–7, theo yêu cầu của Khiêm)
+### So sánh model gốc và model fine-tune (tuần 5–6, theo yêu cầu của Khiêm)
 
-Khiêm chạy backend với model fine-tune trên máy Mac. Bạn chạy `python run_eval.py --golden golden/golden_v2.jsonl --api http://<ip-may-mac>:8000` (cùng mạng Wi-Fi), rồi `judge.py`. So hai báo cáo A và B trên **cùng** bộ đề, cùng giám khảo.
+Mỗi khi Khiêm có model mới, chạy eval hai lần trên **cùng bộ đề**: một lần backend đặt `LLM_MODEL=<model gốc>`, một lần `LLM_MODEL=chatbot-hust`. Chấm bằng cùng `RUBRIC.md`. Gửi Khiêm bảng: điểm đúng, % trích nguồn, % bịa, % từ chối đúng câu ngoài phạm vi, độ trễ trung bình (`latency_ms`).
 
 ### T16b – Thử với người dùng thật (tuần 7)
 
-1. Mời 10–20 sinh viên dùng bản deploy (TV4 gửi link) trong 15 phút.
+1. Mời 10–20 sinh viên dùng bản công khai (TV4 gửi link) trong 15 phút.
 2. Phiếu hỏi ngắn (Google Form): dễ dùng không (1–5), tin câu trả lời không (1–5), câu nào sai, muốn thêm gì.
 3. Câu hỏi hay từ buổi thử: thêm vào bộ đề (thu đáp án HustVA như cũ).
 
 ### T17 – Số liệu tổng (tuần 8)
 
-Bảng cuối: mình vs HustVA theo từng chủ đề; phương án A vs B; tỉ lệ từ chối đúng câu ngoài phạm vi; độ trễ trung bình; 3–5 ví dụ đúng/sai tiêu biểu; kết quả phiếu hỏi T16b; giới hạn của cách đo.
+Bảng cuối: mình vs HustVA theo từng chủ đề; model gốc vs fine-tune; tỉ lệ từ chối đúng câu ngoài phạm vi; độ trễ trung bình; 3–5 ví dụ đúng/sai tiêu biểu; kết quả phiếu hỏi T16b; giới hạn của cách đo (một giám khảo AI, đã kiểm bằng chấm tay).
 
-## 4. Chuyển Google Sheet sang JSONL
+## 4. Chấm điểm bằng AI agent: từng bước
+
+Làm sau mỗi lần chạy `run_eval.py`. 200 câu = 8 lô × 25 câu, mất khoảng 1–2 giờ. Mọi lệnh chạy trong thư mục `eval/`.
+
+### 4.1. Chọn cách làm
+
+| Cách | Dùng khi | Bạn làm gì |
+| --- | --- | --- |
+| **A. Agent đọc/ghi file** (khuyên dùng) | Bạn dùng AI agent lập trình mở được thư mục repo | Gửi lời nhắn script in ra; agent tự đọc đề và tự ghi điểm vào file |
+| **B. AI chỉ chat** | AI của bạn chỉ có khung chat, không đọc/ghi file | Dán đề vào chat, chép kết quả AI trả về dán vào file |
+
+**Giữ cùng một AI và cùng một model** cho mọi lần chạy cần so với nhau (vd. model gốc vs model fine-tune). Đổi giám khảo giữa chừng thì hai con số không so được. Ghi tên AI/model giám khảo vào đầu báo cáo.
+
+### 4.2. Chuẩn bị đề (một lần cho mỗi lần chạy)
+
+```bash
+python judge.py prepare results/<run>.jsonl
+```
+
+Script tạo 2 file cạnh file kết quả:
+- `<run>.judge_tasks.jsonl`: đề cho agent. Mỗi câu có câu hỏi, đáp án chuẩn, và hai câu trả lời `A`, `B`: một của chatbot mình, một của HustVA, đảo ngẫu nhiên.
+- `<run>.judge_key.json`: A/B nào là của ai. **Agent không được mở file này.**
+
+Không chạy `prepare` hai lần cho cùng một lần chạy (A/B sẽ đảo khác, điểm cũ thành sai). Script tự chặn nếu đã có điểm.
+
+### 4.3. Chấm từng lô – cách A (agent đọc/ghi file)
+
+1. Mở một **phiên agent mới** ở thư mục gốc repo. Phiên mới nghĩa là agent chưa đọc code chatbot hay file kết quả, nên không đoán được câu nào của nhóm.
+2. Chạy:
+   ```bash
+   python judge.py status results/<run>.jsonl
+   ```
+   Script in số câu đã chấm, rồi in một lời nhắn nằm giữa hai đường kẻ `=====`, dạng:
+   > Đọc file eval/RUBRIC.md và làm đúng theo đó. Chấm các câu có id sau trong file eval/results/<run>.judge_tasks.jsonl: DKHP-001, DKHP-002, ... Ghi kết quả nối tiếp vào cuối file eval/results/<run>.judge_scores.jsonl ...
+3. Chép nguyên đoạn đó, gửi cho agent. Chờ agent báo xong.
+4. Chạy lại `status`. Kiểm tra:
+   - "Đã chấm hợp lệ" tăng đúng bằng số câu vừa giao (thường 25).
+   - Không có dòng "sai định dạng". Nếu có: nhắn agent *"Dòng X trong file eval/results/<run>.judge_scores.jsonl sai: <lý do status in ra>. Sửa lại đúng định dạng trong RUBRIC.md."* Hoặc xoá dòng đó, câu đó sẽ tự quay lại ở lô sau.
+5. Mở file `<run>.judge_scores.jsonl`, đọc 3 dòng cuối: `note` có khớp với câu hỏi không. Thấy agent chấm bừa (câu nào cũng 2 điểm, `note` giống hệt nhau) thì xoá các dòng của lô đó, mở phiên mới và giao lại.
+6. Lặp lại bước 2–5 đến khi `status` báo **"Đã chấm đủ"**. Cứ 3–4 lô thì mở phiên agent mới, vì phiên dài agent dễ chấm qua loa.
+
+### 4.4. Chấm từng lô – cách B (AI chỉ chat)
+
+1. Mở một cuộc chat mới.
+2. Chạy:
+   ```bash
+   python judge.py status results/<run>.jsonl --paste > lo.txt
+   ```
+   Mở `lo.txt`, chép phần giữa hai đường kẻ `=====` (gồm rubric và 25 câu), dán vào chat.
+3. AI trả về 25 dòng JSON. Chép hết, mở `eval/results/<run>.judge_scores.jsonl` bằng trình soạn thảo (tạo file mới nếu chưa có), dán vào **cuối** file, lưu.
+4. Kiểm tra như cách A bước 4–5, lặp đến khi đủ.
+
+### 4.5. Ra báo cáo
+
+```bash
+python judge.py report results/<run>.jsonl
+```
+
+Tạo `<run>.report.md`: độ chính xác, % trích nguồn, % bịa của mình và HustVA, theo từng chủ đề, và danh sách câu mình sai. Còn cảnh báo "chưa được chấm" thì quay lại 4.3. Sau đó xử lý câu `can_cham_tay` (mục 6) và chép báo cáo vào `eval/reports/`.
+
+### 4.6. Vì sao tin được điểm của agent
+
+- Agent không biết câu trả lời nào của nhóm: A/B đảo ngẫu nhiên, khoá giấu ở file riêng, chấm bằng phiên mới.
+- Mình và HustVA được chấm cùng một rubric, cùng một giám khảo.
+- Ở T11 bạn tự chấm tay 40 câu và so với agent. Khớp ≥ 85% thì ghi con số đó vào báo cáo cuối làm bằng chứng.
+
+## 5. Chuyển Google Sheet sang JSONL
 
 Xuất Sheet thành CSV (`File → Download → CSV`) rồi:
 
@@ -154,24 +222,29 @@ with open("golden.csv", encoding="utf-8") as f, open("golden/golden_v1.jsonl", "
         out.write(json.dumps(r, ensure_ascii=False) + "\n")
 ```
 
-## 5. Xử lý câu `can_cham_tay`
+## 6. Xử lý câu `can_cham_tay`
 
-Mở `.judged.jsonl`, tìm dòng `"can_cham_tay": true`, đọc `scores.judge1` và `scores.judge2`, quyết định điểm đúng. Ghi quyết định vào cột riêng trong file chấm tay (không sửa `.judged.jsonl` gốc), và tính lại bảng tổng bằng điểm của người cho các câu này.
+Mở `.judged.jsonl`, tìm dòng `"can_cham_tay": true`. Câu chưa được chấm: chạy `status` để giao lại cho agent. Câu `unsure`: đọc `scores.ours.note`, `scores.hustva.note`, tự quyết định điểm. Ghi quyết định vào file chấm tay (không sửa `.judged.jsonl` gốc) và tính lại bảng tổng bằng điểm của người cho các câu này.
 
-## 6. Nguyên tắc để số liệu đáng tin
+## 7. Nguyên tắc để số liệu đáng tin
 
 - **Không sửa bộ đề để làm đẹp điểm.** Thêm câu thì được, xoá câu khó thì không. Sửa câu sai chính tả/đáp án chuẩn sai thì ghi lý do trong PR.
+- **Giám khảo không được biết câu nào của ai:** dùng phiên agent mới để chấm, không cho nó mở `*.judge_key.json` hay file kết quả gốc.
 - Bộ đề không được lọt vào dữ liệu fine-tune. `make_sft_dataset.py` tự loại câu giống bộ đề trong `eval/golden/`; khi Khiêm sinh dataset, kiểm lại bằng cách tìm vài câu hỏi bộ đề trong `sft.jsonl`.
-- Mỗi lần chạy ghi rõ commit, model, cấu hình. So sánh hai lần chạy chỉ khi cùng bộ đề và cùng giám khảo.
+- Mỗi lần chạy ghi rõ commit, model, cấu hình. So sánh hai lần chạy chỉ khi cùng bộ đề và cùng rubric.
 - So sánh với HustVA chỉ trên thông tin công khai; ghi rõ giới hạn này trong báo cáo.
 - Log eval vào `chat_logs` với `session_id = 'eval'`. Khi thống kê người dùng thật nhớ loại các dòng này.
 
-## 7. Lỗi thường gặp
+## 8. Lỗi thường gặp
 
 | Hiện tượng | Cách xử lý |
 | --- | --- |
-| Mọi câu sau câu đầu báo `LỖI` 429 | Chưa đặt `MIN_SECONDS_BETWEEN_QUESTIONS=0`, hoặc đặt rồi nhưng chưa khởi động lại backend |
-| `run_eval` báo `ConnectError` | Backend chưa chạy, hoặc sai `--api` |
-| `judge.py` báo `Chưa đặt JUDGE1_MODEL` | Thiếu biến trong `.env` |
-| `judge.py` báo lỗi JSON ở một câu | Giám khảo trả không đúng JSON; câu đó bị đánh `can_cham_tay`. Nhiều câu như vậy thì đổi model giám khảo hoặc hạ `temperature` |
-| Câu trả lời mock giống hệt nhau | Đang chạy `LLM_PROVIDER=mock`; kiểm tra `/api/health` |
+| `UnicodeEncodeError: 'charmap'` trên Windows | `set PYTHONUTF8=1` (cmd) hoặc `$env:PYTHONUTF8=1` (PowerShell) trước khi chạy |
+| Mọi câu sau câu đầu báo `LỖI` 429 | Backend chưa đặt `MIN_SECONDS_BETWEEN_QUESTIONS=0`, hoặc đặt rồi nhưng chưa khởi động lại |
+| `run_eval` báo `ConnectError` | Backend chưa chạy, sai `--api`, hoặc Wi-Fi chặn kết nối tới Mac (dùng hotspot) |
+| `run_eval` báo timeout | Model local chậm; câu trả lời quá dài. Báo Khiêm |
+| `report` báo câu chưa được chấm | Agent bỏ sót; chạy `status`, giao lô tiếp theo (script tự chọn các câu còn thiếu) |
+| `status` báo dòng sai định dạng | Agent ghi `"2"` thay vì `2`, thiếu trường, hoặc bọc trong khối code; xem mục 4.3 bước 4 |
+| `prepare` báo đã có file điểm | Lần chạy này đã chuẩn bị rồi; dùng `status` để chấm tiếp. Muốn chấm lại từ đầu thì xoá `<run>.judge_scores.jsonl` |
+| Agent nói không đọc được file | Agent không mở ở thư mục repo, hoặc chỉ chat được: dùng cách B (mục 4.4) |
+| Câu trả lời giống hệt nhau | Backend đang chạy `LLM_PROVIDER=mock`; kiểm tra `/api/health` |
