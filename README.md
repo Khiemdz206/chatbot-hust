@@ -24,11 +24,10 @@ chatbot-hust/
 
 | Phần | Người | Thư mục chính | Hướng dẫn |
 | --- | --- | --- | --- |
-| Lead / AI (RAG) | Khiêm | `backend/app/rag/` | [12-ai-rag.md](docs/12-ai-rag.md) |
+| Lead / AI (RAG) | Khiêm | `backend/app/rag/` and fine-tune | [12-ai-rag.md](docs/12-ai-rag.md) | [14-finetune.md](docs/14-finetune.md) |
 | Data | TV2 | `data/`, `supabase/` | [13-data.md](docs/13-data.md) |
 | Eval | TV3 | `eval/` | [15-eval.md](docs/15-eval.md) |
-| Fine-tune | TV4 | `finetune/` | [14-finetune.md](docs/14-finetune.md) |
-| UI + Backend | TV5 | `web/`, `backend/app/` | [10-ui.md](docs/10-ui.md), [11-backend.md](docs/11-backend.md) |
+| UI + Backend | TV4 | `web/`, `backend/app/` | [10-ui.md](docs/10-ui.md), [11-backend.md](docs/11-backend.md) |
 
 Kế hoạch 8 tuần: [docs/01-ke-hoach.md](docs/01-ke-hoach.md). Hợp đồng API giữa các phần: [docs/02-api-contract.md](docs/02-api-contract.md). Quy trình Git: [CONTRIBUTING.md](CONTRIBUTING.md).
 
