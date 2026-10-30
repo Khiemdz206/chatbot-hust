@@ -4,8 +4,8 @@
 #   id            : tên ngắn không dấu, dùng làm tên file (vd. quy-che-dao-tao-2025)
 #   type          : html | pdf
 #   doc_type      : quy_che | thong_bao | so_tay | huong_dan
-#   topic         : dkhp | hoc_phi | diem | tot_nghiep | hoc_bong | khac
-#   effective_date: ngày hiệu lực YYYY-MM-DD (nếu văn bản ghi rõ)
+#   topic         : quy_che | dkhp | hoc_phi | diem | tot_nghiep | hoc_bong | thong_bao | khac  (xem docs/02-api-contract.md mục 11)
+#   effective_date: ngày hiệu lực "YYYY-MM-DD", PHẢI để trong ngoặc kép (nếu văn bản ghi rõ), không có thì null
 #   applies_to    : khoá áp dụng (nếu có)
 #
 # Hai mục dưới là MẪU để thấy định dạng. Thay bằng URL thật trên trang của trường.

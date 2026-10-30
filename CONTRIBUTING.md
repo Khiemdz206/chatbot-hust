@@ -4,7 +4,7 @@ Hướng dẫn cho người chưa quen làm việc nhóm bằng Git. Làm đúng
 
 ## Thiết lập một lần
 
-1. Lead tạo repo trên GitHub, mời 4 người còn lại vào **Settings → Collaborators**.
+1. Lead tạo repo trên GitHub, mời 3 người còn lại vào **Settings → Collaborators**.
 2. Lead bật bảo vệ nhánh: **Settings → Branches → Add rule** cho `main`, tick *Require a pull request before merging* và *Require approvals (1)*.
 3. Mỗi người:
    ```bash

@@ -1,8 +1,23 @@
-# Hợp đồng API
+# Hợp đồng giữa các phần
 
-Đây là "luật chơi" giữa UI, Backend, AI và Eval. Ai cũng code theo file này nên làm song song được. **Muốn đổi: mở PR sửa file này trước, cả nhóm đồng ý rồi mới sửa code.**
+File này ghi **mọi định dạng dữ liệu đi từ phần này sang phần khác**: API HTTP, sự kiện của pipeline, file JSONL, bảng CSDL, biến `.env`. Ai cũng code theo file này nên 4 người làm song song được.
 
-Code tương ứng: `backend/app/schemas.py`, `backend/app/main.py`, `web/app.js`.
+**Muốn đổi bất cứ thứ gì ở đây:** báo người dùng định dạng đó (cột "Ai đọc"), sửa file này trong cùng PR với code.
+
+| Mục | Ai tạo | Ai đọc | Code tương ứng |
+| --- | --- | --- | --- |
+| [1. `POST /api/chat`](#1-post-apichat) | TV4 (BE) | TV4 (UI), TV3 (eval) | `backend/app/main.py`, `backend/app/schemas.py`, `web/app.js`, `eval/run_eval.py` |
+| [2. `POST /api/feedback`](#2-post-apifeedback) | TV4 | TV4 | `main.py`, `store.py` |
+| [3. Endpoint khác](#3-endpoint-khác) | TV4 | cả nhóm | `main.py` |
+| [4. Mã lỗi](#4-mã-lỗi) | TV4 | TV4, TV3 | `main.py`, `web/app.js` |
+| [5. `pipeline.answer()`](#5-pipelineanswer-hợp-đồng-giữa-backend-và-ai) | Khiêm | TV4 | `backend/app/rag/pipeline.py` |
+| [6. `chunks.jsonl`](#6-datachunkschunksjsonl) | TV2 | Khiêm (fine-tune) | `data/chunk.py`, `finetune/make_sft_dataset.py` |
+| [7. Bảng Supabase](#7-bảng-supabase) | TV2 + TV4 | Khiêm, TV4 | `supabase/migrations/`, `data/embed_upload.py`, `rag/retriever.py`, `store.py` |
+| [8. Bộ đề `golden/*.jsonl`](#8-bộ-đề-evalgoldenjsonl) | TV3 | Khiêm (recall@k, lọc dataset) | `eval/run_eval.py`, `finetune/make_sft_dataset.py` |
+| [9. Kết quả eval](#9-kết-quả-eval-evalresults) | TV3 | cả nhóm | `eval/run_eval.py`, `eval/judge.py` |
+| [10. Dataset SFT](#10-dataset-sft-finetunedatasetssftjsonl) | Khiêm | Khiêm (Colab) | `finetune/make_sft_dataset.py`, `finetune/train_lora_colab.py` |
+| [11. Mã chủ đề](#11-mã-chủ-đề-topic) | – | cả nhóm | `data/sources.yaml`, `eval/golden/` |
+| [12. Biến `.env`](#12-biến-env) | – | cả nhóm | `.env.example`, `backend/app/config.py`, `common/llm.py` |
 
 ## 1. `POST /api/chat`
 
@@ -22,8 +37,8 @@ Code tương ứng: `backend/app/schemas.py`, `backend/app/main.py`, `web/app.js
 | Trường | Bắt buộc | Ràng buộc |
 | --- | --- | --- |
 | `message` | có | 1–1000 ký tự |
-| `session_id` | không | ≤ 100 ký tự; dùng để giới hạn tần suất và gom log |
-| `history` | không | tối đa 12 phần tử; UI gửi 6 phần tử gần nhất |
+| `session_id` | không | ≤ 100 ký tự; dùng để giới hạn tần suất và gom log. UI tạo bằng `crypto.randomUUID()` và lưu `localStorage["chatbot-session"]`. Eval gửi `"eval"`. |
+| `history` | không | tối đa 12 phần tử, mỗi `content` ≤ 4000 ký tự; UI gửi 6 phần tử gần nhất |
 
 ### Response mặc định: stream (SSE, `text/event-stream`)
 
@@ -44,9 +59,9 @@ data: {"answer_id": "uuid", "refused": false, "latency_ms": 2140}
 ```
 
 - `token`: nhiều lần, nối lại thành câu trả lời.
-- `sources`: một lần. `n` khớp với số `[n]` trong câu trả lời. Có thể là mảng rỗng.
-- `done`: một lần, cuối cùng. `answer_id` dùng cho feedback. `refused: true` nghĩa là chatbot từ chối (không tìm thấy hoặc ngoài phạm vi).
-- `error`: thay cho `done` khi có lỗi giữa chừng: `{"code": "UPSTREAM_ERROR", "message": "..."}`.
+- `sources`: đúng một lần. `n` khớp với số `[n]` trong câu trả lời. Có thể là mảng rỗng. `section`, `url`, `effective_date` có thể `null`.
+- `done`: đúng một lần, cuối cùng. `answer_id` dùng cho feedback. `refused: true` nghĩa là chatbot từ chối (không tìm thấy văn bản hoặc ngoài phạm vi).
+- `error`: thay cho `done` khi lỗi giữa chừng: `{"code": "UPSTREAM_ERROR", "message": "..."}`. Sau `error` không có sự kiện nào nữa.
 
 ### Response không stream: `POST /api/chat?stream=false`
 
@@ -65,39 +80,179 @@ Script eval dùng cách này.
 ## 2. `POST /api/feedback`
 
 ```json
-{"answer_id": "uuid", "rating": 1, "comment": "tuỳ chọn"}
+{"answer_id": "uuid", "rating": 1, "comment": "tuỳ chọn, ≤ 1000 ký tự"}
 ```
 
-`rating`: `1` (đúng) hoặc `-1` (sai). Trả `{"ok": true}`.
+`rating`: `1` (đúng) hoặc `-1` (sai). Trả `{"ok": true}`. Ghi vào bảng `feedback`.
 
-## 3. `GET /api/health`
+## 3. Endpoint khác
 
-```json
-{"status": "ok", "llm_provider": "anthropic", "llm_model": "claude-opus-5-5", "retriever": "supabase"}
-```
+| Endpoint | Trả về | Ghi chú |
+| --- | --- | --- |
+| `GET /api/health` | `{"status": "ok", "llm_provider": "anthropic", "llm_model": "claude-opus-5-5", "retriever": "supabase"}` | Kiểm tra backend đang chạy cấu hình nào |
+| `POST /admin/reindex` | `{"ok": true, "message": "..."}` | Header `X-Admin-Token: <ADMIN_TOKEN>`. Chưa cài (T9) |
+| `GET /admin/stats` | xem [11-backend.md, T12b](11-backend.md#t12b--thống-kê-cho-nhóm-tuần-4) | Header `X-Admin-Token`. Chưa cài (T12b) |
+| `GET /docs` | Trang thử API do FastAPI tự sinh | |
+| `GET /` | Giao diện trong `web/` | Backend phục vụ thư mục `web/` |
 
-Dùng để kiểm tra nhanh backend đang chạy với cấu hình nào.
+## 4. Mã lỗi
 
-## 4. `POST /admin/reindex`
-
-Header `X-Admin-Token: <ADMIN_TOKEN trong .env>`. Kích hoạt nạp lại dữ liệu (task T9, chưa cài).
-
-## 5. Mã lỗi
+Mọi lỗi HTTP do backend tự trả có body `{"code": "...", "message": "..."}`.
 
 | HTTP | `code` | Khi nào | UI hiển thị |
 | --- | --- | --- | --- |
-| 422 | (lỗi validate của FastAPI) | `message` rỗng hoặc quá dài | "Câu hỏi không hợp lệ" |
-| 429 | `RATE_LIMITED` | Hỏi liên tục trong < 2 giây | "Chờ vài giây rồi hỏi lại" |
+| 401 | `UNAUTHORIZED` | Sai `X-Admin-Token` | – |
+| 422 | (body mặc định của FastAPI, có trường `detail`) | `message` rỗng hoặc quá dài | "Câu hỏi không hợp lệ" |
+| 429 | `RATE_LIMITED` | Cùng `session_id` hỏi lại trong < `MIN_SECONDS_BETWEEN_QUESTIONS` giây; (sau T19) vượt hạn mức ngày | Hiện `message` từ backend |
 | 502 / sự kiện `error` | `UPSTREAM_ERROR` | Model hoặc CSDL lỗi | Thông báo + nút "Thử lại" |
 
-## 6. Hợp đồng bên trong backend (giữa BE và AI)
+## 5. `pipeline.answer()`: hợp đồng giữa Backend và AI
 
 Backend chỉ gọi đúng một hàm:
 
 ```python
 from app.rag import pipeline
+
 async for ev in pipeline.answer(question: str, history: list[dict]):
-    # ev["type"] là "token" | "sources" | "meta"
+    ...
 ```
 
-AI được thay đổi mọi thứ bên trong `backend/app/rag/` miễn giữ đúng hàm này.
+Các sự kiện, đúng thứ tự:
+
+| `ev["type"]` | Số lần | Các trường khác |
+| --- | --- | --- |
+| `"token"` | ≥ 1 | `text: str` |
+| `"sources"` | 1 | `items: list[dict]`, mỗi phần tử `{n, title, section, url, effective_date}` (giống mục 1) |
+| `"meta"` | 1, cuối cùng | `refused: bool`, `rewritten: str`, `model: str`, `chunk_ids: list[str]` (rỗng khi refused), `cited: list[int]` (khi không refused), `usage: {"input_tokens": int, "output_tokens": int} \| None` (**thêm ở T19**, mock trả `None`) |
+
+- Khiêm được sửa mọi thứ bên trong `backend/app/rag/` miễn giữ đúng bảng trên.
+- Thêm trường vào `meta` thì được (backend bỏ qua trường lạ). Bỏ hoặc đổi tên trường thì phải báo TV4.
+- `pipeline.answer` có thể ném exception; backend bắt và trả `UPSTREAM_ERROR`.
+
+Kiểu `Chunk` (`backend/app/rag/retriever.py`), dùng chung với fine-tune:
+
+```python
+@dataclass
+class Chunk:
+    id: str
+    title: str
+    content: str
+    section: str | None = None
+    url: str | None = None
+    effective_date: str | None = None
+    score: float = 0.0
+```
+
+## 6. `data/chunks/chunks.jsonl`
+
+Do `data/chunk.py` tạo, mỗi dòng một chunk:
+
+```json
+{"source_id": "quy-che-dao-tao-2025", "title": "Quy chế đào tạo đại học", "url": "https://...",
+ "doc_type": "quy_che", "topic": "diem", "effective_date": "2025-08-01", "applies_to": "K70 trở đi",
+ "content_hash": "sha256...", "chunk_index": 12, "section": "Chương II – Điều 12. Đăng ký học tập",
+ "content": "1. Sinh viên ..."}
+```
+
+- `source_id` = `id` trong `sources.yaml`. `source_id` + `chunk_index` là duy nhất. Fine-tune dùng `"<source_id>#<chunk_index>"` làm id chunk.
+- `url` phải **khác nhau giữa các văn bản**: `embed_upload.py` gom chunk theo `url`.
+- `section` dạng `"Chương <số La Mã>. <tên> – Điều <số>. <tên>"`, hoặc `null` với văn bản không chia Điều.
+
+## 7. Bảng Supabase
+
+Định nghĩa đầy đủ: `supabase/migrations/001_init.sql`. Không sửa file migration đã chạy; muốn đổi thì thêm file mới `002_<mo-ta>.sql`, `003_...`.
+
+| Bảng | Ai ghi | Cột chính |
+| --- | --- | --- |
+| `documents` | `data/embed_upload.py` | `id`, `title`, `url` (unique), `doc_type`, `topic`, `effective_date`, `applies_to`, `is_active`, `content_hash` |
+| `chunks` | `data/embed_upload.py` | `id`, `document_id`, `chunk_index`, `section`, `content`, `embedding vector(1024)`, `tsv` (tự sinh) |
+| `chat_logs` | `backend/app/store.py` | `id` (= `answer_id`), `session_id`, `question`, `rewritten_question`, `answer`, `chunk_ids text[]`, `model`, `refused`, `latency_ms`, `created_at` |
+| `feedback` | `backend/app/store.py` | `answer_id`, `rating` (1/-1), `comment`, `created_at` |
+
+Hàm tìm kiếm (backend gọi qua `client.rpc`):
+
+```sql
+match_chunks(query_embedding vector(1024), query_text text, match_count int default 6, rrf_k int default 50)
+returns table (id bigint, document_id bigint, section text, content text, title text, url text, effective_date date, score float)
+```
+
+- Chỉ trả chunk của văn bản `is_active = true`.
+- `vector(1024)` là số chiều của `BAAI/bge-m3`. Đổi model embedding thì phải đổi số chiều **và** embed lại toàn bộ.
+- `chat_logs.chunk_ids` là `id` của bảng `chunks` (dạng chuỗi).
+
+## 8. Bộ đề `eval/golden/*.jsonl`
+
+Mỗi dòng một câu:
+
+```json
+{"id": "DKHP-007", "topic": "dkhp", "difficulty": "medium", "in_scope": true,
+ "question": "đkhp bổ sung muộn có bị phạt k ạ",
+ "reference_answer": "Đáp án đúng, ngắn, lấy từ văn bản chính thức",
+ "reference_source": "https://ctt.hust.edu.vn/...#Điều 12",
+ "hustva_answer": "Chép nguyên văn câu trả lời của HustVA",
+ "collected_at": "2026-11-05", "collected_by": "TV3"}
+```
+
+| Trường | Bắt buộc | Quy ước |
+| --- | --- | --- |
+| `id` | có | `<TIỀN TỐ CHỦ ĐỀ>-<3 chữ số>`, vd. `DKHP-007`, `HP-012`, `NPV-003`. Không đổi id đã có. |
+| `topic` | có | Một mã ở [mục 11](#11-mã-chủ-đề-topic) |
+| `difficulty` | có | `easy` (một ý trong một Điều) · `medium` (ghép 2 ý) · `hard` (nhiều văn bản, điều kiện, ngoại lệ) |
+| `in_scope` | có | `false` cho câu ngoài phạm vi (topic `ngoai_pham_vi`) |
+| `question` | có | Viết như sinh viên nhắn tin thật |
+| `reference_answer` | có | Câu ngoài phạm vi: ghi `"Từ chối, gợi ý chủ đề hỗ trợ"` |
+| `reference_source` | có nếu `in_scope` | **Đúng dạng `<url>#Điều <số>`**, nhiều nguồn ngăn bằng ` ; `. `<url>` phải trùng `url` trong `sources.yaml`. Văn bản không có Điều: chỉ ghi `<url>`. Script recall@k của Khiêm đọc trường này. |
+| `hustva_answer` | có | Chép nguyên văn. HustVA không trả lời: ghi `""` |
+| `collected_at`, `collected_by` | có | Ngày hỏi HustVA (`YYYY-MM-DD`), người hỏi |
+
+Các dòng có `id` bắt đầu bằng `MAU-` là mẫu, xoá khi có câu thật.
+
+## 9. Kết quả eval (`eval/results/`)
+
+- `run_eval.py` → `results/<YYYYMMDD-HHMM>_<commit>.jsonl`: mỗi dòng = dòng bộ đề + `system_answer`, `system_sources`, `system_refused`, `error`, `latency_ms`.
+- `judge.py` → `<cùng tên>.judged.jsonl` (thêm `scores`, `can_cham_tay`) và `<cùng tên>.report.md`.
+- `scores` có dạng `{"judge1": {"ours": {...}, "hustva": {...}}, "judge2": {...}}`, mỗi `{...}` là `{"correct": 0|1|2, "hallucination": bool, "cites_source": bool, "note": str}`.
+- `eval/results/` không lên Git. Báo cáo dùng để so sánh thì chép vào `eval/reports/` và commit.
+
+## 10. Dataset SFT (`finetune/datasets/sft.jsonl`)
+
+```json
+{"messages": [{"role": "system", "content": "<SYSTEM_PROMPT>"},
+              {"role": "user", "content": "<tai_lieu>...</tai_lieu>\n\nCâu hỏi: ..."},
+              {"role": "assistant", "content": "..."}],
+ "meta": {"target": "quy-che-dao-tao-2025#12", "answerable": true}}
+```
+
+Phần `user` được tạo bằng đúng `build_messages()` trong `backend/app/rag/prompts.py`. Đổi `SYSTEM_PROMPT` hoặc `format_context()` thì dataset cũ hết dùng được.
+
+## 11. Mã chủ đề (`topic`)
+
+Dùng chung cho `sources.yaml` và bộ đề:
+
+| Mã | Chủ đề | Tiền tố id bộ đề |
+| --- | --- | --- |
+| `quy_che` | Quy chế đào tạo chung (tín chỉ, cảnh báo học tập, chuyển ngành...) | `QC` |
+| `dkhp` | Đăng ký học phần | `DKHP` |
+| `hoc_phi` | Học phí | `HP` |
+| `diem` | Điểm, cách tính CPA/GPA, học lại, cải thiện | `DIEM` |
+| `tot_nghiep` | Điều kiện tốt nghiệp | `TN` |
+| `hoc_bong` | Học bổng | `HB` |
+| `thong_bao` | Thông báo trên CTT | `TB` |
+| `khac` | Thứ khác trong phạm vi | `KHAC` |
+| `ngoai_pham_vi` | Câu ngoài phạm vi (chỉ có trong bộ đề) | `NPV` |
+
+## 12. Biến `.env`
+
+File `.env` ở thư mục gốc, mẫu là `.env.example`. Thêm biến mới: thêm vào `.env.example` (kèm comment) và `backend/app/config.py` nếu backend dùng.
+
+| Biến | Ai dùng | Ý nghĩa |
+| --- | --- | --- |
+| `LLM_PROVIDER`, `LLM_MODEL`, `MAX_ANSWER_TOKENS` | backend | `mock` \| `anthropic` \| `openai_compat` |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENAI_BASE_URL` | backend, `common/llm.py` | Key dùng chung |
+| `RETRIEVER`, `TOP_K`, `EMBED_MODEL` | backend, `data/embed_upload.py` | `mock` \| `supabase` |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | backend, `data/` | Dùng **service_role key** |
+| `CORS_ORIGINS`, `MIN_SECONDS_BETWEEN_QUESTIONS`, `ADMIN_TOKEN` | backend | |
+| `TEACHER_PROVIDER`, `TEACHER_MODEL` | `finetune/make_sft_dataset.py` | Model sinh dữ liệu |
+| `JUDGE1_*`, `JUDGE2_*` (`_PROVIDER`, `_MODEL`, `_BASE_URL`, `_API_KEY`) | `eval/judge.py` | Hai giám khảo, nên khác hãng |
+| `REWRITE_PROVIDER`, `REWRITE_MODEL` | `rag/pipeline.py` (thêm ở T10) | Model rẻ để viết lại câu hỏi |
+| `DAILY_QUESTION_LIMIT` | backend (thêm ở T19) | Hạn mức câu hỏi mỗi ngày |
